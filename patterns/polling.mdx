@@ -1,0 +1,59 @@
+---
+title: 'Recursive Polling'
+description: 'Turn any polling API into an async webhook'
+---
+
+If you depend on a 3rd-party API that processes data (like video encoding or AI generation) but *doesn't* offer webhooks, you usually have to run a cron job to poll for status.
+
+With Posthook, you can create a "self-healing" loop that checks the status and reschedules itself if the job isn't done yet.
+
+## Workflow
+
+1.  **Schedule**: Trigger the job and schedule the first check.
+2.  **Handle**: Check status. If `pending`, reschedule. If `completed`, process the result.
+
+```javascript
+/* 1. Schedule */
+async function startVideoEncoding(videoFile) {
+  // 1. Start the job on the 3rd party API
+  const job = await transcoderApi.start(videoFile);
+
+  // 2. Schedule the first check for 1 minute later
+  posthook.schedule({
+    path: '/webhooks/check-status',
+    postAt: new Date(Date.now() + 60 * 1000).toISOString(),
+    data: {
+      jobId: job.id
+    }
+  });
+}
+
+/* 2. Handle */
+app.post('/webhooks/check-status', async (req, res) => {
+  // Verify the signature (see 'Hook Fulfillment' for implementation)
+  if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
+
+  const { jobId } = req.body.data;
+  const job = await transcoderApi.get(jobId);
+
+  if (job.status === 'completed') {
+    // DONE: Process the result
+    await db.saveVideo(job.url);
+    return res.status(200).send('Video processed');
+  }
+
+  if (job.status === 'failed') {
+    // FAIL: Handle error (maybe alert team)
+    return res.status(200).send('Job failed');
+  }
+
+  // PENDING: Reschedule check for another minute
+  await posthook.schedule({
+    path: '/webhooks/check-status',
+    postAt: new Date(Date.now() + 60 * 1000).toISOString(),
+    data: { jobId }
+  });
+
+  res.status(200).send('Still pending, rescheduled');
+});
+```

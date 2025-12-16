@@ -1,0 +1,44 @@
+---
+title: 'Recurring Tasks'
+description: 'Schedule daily jobs and maintenance workflows'
+---
+
+Sequences are ideal for orchestrating recurring system-level tasks, such as daily reports, database maintenance, or health checks.
+
+## Daily Metric Snapshots
+
+This pattern allows you to take a "snapshot" of your key performance indicators (KPIs) every day at midnight and report them to your team.
+
+```yaml
+# Daily KPI Snapshot
+snapshotRevenue:
+  path: /webhooks/metrics/revenue
+snapshotActiveUsers:
+  path: /webhooks/metrics/active-users
+notifySlack:
+  path: /webhooks/notifications/slack
+  requires:
+    - snapshotRevenue
+    - snapshotActiveUsers
+```
+
+### Why this works
+1.  **Parallel Execution**: `snapshotRevenue` and `snapshotActiveUsers` capture data simultaneously.
+2.  **Aggregation**: `notifySlack` waits for both snapshots to finish successfully before posting a summary.
+3.  **Reliability**: Partial failures stop the reporting step, ensuring you only report complete data.
+
+## Periodic Health Checks
+
+You can run distributed health checks every few minutes to verify system uptime.
+
+```yaml
+# 5-min Health Check
+pingServiceA:
+  path: /webhooks/service-a/health
+pingServiceB:
+  path: /webhooks/service-b/health
+pingDatabase:
+  path: /webhooks/database/health
+```
+
+All checks run in parallel, giving you a comprehensive snapshot of system health at that moment.

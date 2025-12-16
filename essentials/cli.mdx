@@ -1,0 +1,42 @@
+---
+title: 'CLI Reference'
+description: 'Command line tool for local development'
+---
+
+The Posthook CLI helps you develop and test your webhooks locally.
+
+## Installation
+
+You don't need to install the CLI globally. You can run it on-demand using `npx`.
+
+```bash
+npx posthook <command>
+```
+
+## Commands
+
+### Login
+
+Authenticates your CLI with your Posthook account. This prompts for your API Key (found in Dashboard Settings) and saves it locally.
+
+```bash
+npx posthook login
+```
+
+### Listen
+
+Connects to Posthook via WebSocket and forwards incoming webhooks to a local URL.
+
+```bash
+npx posthook listen --forward <LOCAL_URL>
+```
+
+**Options**:
+- `--forward <url>`: The local URL to forward requests to (e.g., `http://localhost:3000`).
+- `--api-key <key>`: (Optional) Manually specify an API key instead of using the logged-in user's key.
+- `--verbose`: Show detailed logs of incoming requests.
+
+**Example**:
+```bash
+npx posthook listen --forward http://localhost:8080
+```

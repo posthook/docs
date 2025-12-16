@@ -1,0 +1,97 @@
+---
+title: 'User Engagement'
+description: 'Schedule reminders, follow-ups, and recovery emails'
+---
+
+Posthook is perfect for powering user engagement workflows that require timing delays, such as reminders or abandoned cart recovery.
+
+## Event Reminders
+
+Send a reminder 1 hour before a scheduled event starts.
+
+1.  **Schedule**: When the user books, schedule the reminder.
+2.  **Handle**: When the hook fires, send the email.
+
+```javascript
+/* 1. Schedule */
+function onWebinarBooking(booking) {
+  const eventTime = new Date(booking.date);
+  const reminderTime = new Date(eventTime.getTime() - 60 * 60 * 1000); // 1 hour before
+
+  posthook.schedule({
+    path: '/webhooks/send-email',
+    postAt: reminderTime.toISOString(),
+    // LEAST PRIVILEGE: Only send the ID. Don't send PII or template logic.
+    data: {
+      bookingId: booking.id,
+    }
+  });
+}
+
+/* 2. Handle */
+app.post('/webhooks/send-email', async (req, res) => {
+  // Verify the signature (see 'Hook Fulfillment' for implementation)
+  if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
+
+  const { bookingId } = req.body.data;
+  const booking = await db.getBooking(bookingId);
+
+  // VALIDITY CHECKS:
+  if (!booking || booking.status === 'cancelled') {
+    return res.status(200).send('Booking cancelled or not found');
+  }
+  
+  if (booking.reminderSent) {
+    return res.status(200).send('Reminder already sent');
+  }
+
+  // Derive logic from your DB, not the payload
+  const template = booking.type === 'webinar' ? 'webinar_reminder' : 'event_reminder';
+
+  await emailService.send(booking.userId, template, { event: booking.event });
+  await db.markReminderSent(bookingId);
+  
+  res.status(200).send('Reminder sent');
+});
+```
+
+## Abandoned Cart Recovery
+
+If a user adds items to their cart but doesn't checkout, schedule a "nudge" email for 30 minutes later.
+
+Instead of trying to cancel the hook when a user purchases, it's often simpler to **verify validity at execution time**.
+
+1.  **Schedule**: When the user adds an item, schedule the email for 30 minutes later.
+2.  **Verify**: When the webhook handler receives the request, check if the cart has been converted to an order.
+
+```javascript
+/* 1. Schedule the Nudge */
+function onAddToCart(cart) {
+  posthook.schedule({
+    path: '/webhooks/cart/abandoned',
+    postAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    data: {
+      cartId: cart.id
+    }
+  });
+}
+
+/* 2. Handle & Verify */
+app.post('/webhooks/cart/abandoned', async (req, res) => {
+  // Verify the signature (see 'Hook Fulfillment' for implementation)
+  if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
+
+  const { cartId } = req.body.data;
+  const cart = await db.getCarts(cartId);
+
+  // IDEMPOTENCY CHECK:
+  // If the cart is already "completed" or "paid", do nothing.
+  if (cart.status === 'completed') {
+    return res.status(200).send('Cart already recovered');
+  }
+
+  // Otherwise, send the email
+  await sendRecoveryEmail(cart.userId);
+  res.status(200).send('Email sent');
+});
+```

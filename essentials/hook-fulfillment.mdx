@@ -1,0 +1,203 @@
+---
+title: 'Hook Fulfillment'
+description: 'How we deliver your Scheduled Hooks'
+---
+
+When a scheduled time arrives, Posthook makes an HTTP POST request to your destination.
+
+The destination URL is constructed by combining your **Project Domain** (configured in settings) with the **Path** specified when scheduling the hook.
+
+> `api.myapp.com` (Domain) + `/webhooks/remind` (Path) = `https://api.myapp.com/webhooks/remind` (HTTPS is enforced)
+
+## The Request
+
+Posthook sends a `POST` request with a wrapper object containing your data and metadata about the scheduling.
+
+```json
+{
+  "id": "hook_01H...",
+  "path": "/webhooks/remind",
+  "postAt": "2024-01-01T12:00:00Z",
+  "postedAt": "2024-01-01T12:00:00.123Z",
+  "data": {
+    "user_id": "usr_123",
+    "reminder_id": "rem_456"
+  },
+  "createdAt": "2023-12-31T12:00:00Z",
+  "updatedAt": "2023-12-31T12:00:00Z"
+}
+```
+
+### Headers
+
+| Header | Description |
+| --- | --- |
+| `Content-Type` | `application/json` |
+| `X-Ph-Signature` | The HmacSHA256 signature of the payload, signed with your project's Signing Key. |
+| `User-Agent` | `Posthook/1.0` |
+
+### Retries
+
+If your endpoint returns a non-200 status code, or times out (timeout is 10 seconds), Posthook will retry the delivery based on your project's retry configuration.
+
+You can configure:
+- **Max Retries**: 1 to 10 attempts.
+- **Retry Delay**: 5 to 60 seconds between attempts.
+
+
+### Handling Long-Running Tasks
+
+Posthook has a strict **10-second timeout** for webhook delivery. If your task takes longer than 10 seconds (e.g., generating a PDF, processing a video), your request will time out and be retried.
+
+To handle this, you should implement an **Async Pattern**:
+1.  Receive the webhook.
+2.  Push the job to an internal background queue (e.g., Redis, SQS, BullMQ).
+3.  **Return `200 OK` immediately** to Posthook.
+4.  Process the job asynchronously in your worker.
+
+<Tip>
+  If you need to track the completion of these long-running tasks (especially if they are 3rd-party APIs), check out the [Recursive Polling](/patterns/polling) pattern.
+</Tip>
+
+## Verifying Signatures
+
+To ensure that the request comes from Posthook and not a malicious actor, you must verify the signature.
+
+You will need your **Signing Key**, found in **Project Settings** in the [Dashboard](https://posthook.io/app/home).
+
+<CodeGroup>
+
+```javascript Node.js
+const crypto = require('crypto');
+
+// Posthook POSTs to the path you specified when scheduling
+app.post('/webhooks/posthook/send-reminder', (req, res) => {
+  const signature = req.headers['x-ph-signature'];
+  const expected = crypto
+    .createHmac('sha256', process.env.POSTHOOK_SIGNING_KEY)
+    .update(JSON.stringify(req.body))
+    .digest('hex');
+
+  if (signature !== expected) {
+    return res.status(401).send('Invalid signature');
+  }
+
+  // Your payload is inside the 'data' field
+  const { user_id, reminder_id } = req.body.data;
+  
+  // Use reminder_id as idempotency key for actions that should only run once
+  sendReminder(user_id, reminder_id);
+
+  res.status(200).send('OK');
+});
+```
+
+```python Python
+import hmac
+import hashlib
+import os
+from flask import Flask, request
+
+app = Flask(__name__)
+
+# Posthook POSTs to the path you specified when scheduling
+@app.route('/webhooks/posthook/send-reminder', methods=['POST'])
+def handle_send_reminder():
+    signature = request.headers.get('X-Ph-Signature')
+    expected = hmac.new(
+        os.environ['POSTHOOK_SIGNING_KEY'].encode(),
+        request.get_data(),
+        hashlib.sha256
+    ).hexdigest()
+
+    if signature != expected:
+        return 'Invalid signature', 401
+
+    # Your payload is inside the 'data' field
+    payload = request.json['data']
+    user_id = payload.get('user_id')
+    reminder_id = payload.get('reminder_id')
+    
+    # Use reminder_id as idempotency key for actions that should only run once
+    send_reminder(user_id, reminder_id)
+
+    return 'OK', 200
+```
+
+```go Go
+package main
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
+	"net/http"
+	"os"
+)
+
+func handleSendReminder(w http.ResponseWriter, r *http.Request) {
+	signature := r.Header.Get("X-Ph-Signature")
+	body, _ := io.ReadAll(r.Body)
+
+	mac := hmac.New(sha256.New, []byte(os.Getenv("POSTHOOK_SIGNING_KEY")))
+	mac.Write(body)
+	expected := hex.EncodeToString(mac.Sum(nil))
+
+	if signature != expected {
+		http.Error(w, "Invalid signature", http.StatusUnauthorized)
+		return
+	}
+
+    // You would define a struct matching the HookPost shape
+	// and json.Unmarshal(body, &hook)
+    // hook.Data contains your payload
+
+	// Process the hook...
+	w.WriteHeader(http.StatusOK)
+}
+```
+
+```ruby Ruby
+require 'sinatra'
+require 'openssl'
+require 'json'
+
+post '/webhooks/posthook/send-reminder' do
+  request.body.rewind
+  payload = request.body.read
+  signature = request.env['HTTP_X_PH_SIGNATURE']
+
+  digest = OpenSSL::Digest.new('sha256')
+  expected = OpenSSL::HMAC.hexdigest(digest, ENV['POSTHOOK_SIGNING_KEY'], payload)
+
+  halt 401, 'Invalid signature' unless signature == expected
+
+  data = JSON.parse(payload)['data']
+  # Process...
+  status 200
+end
+```
+
+```php PHP
+<?php
+
+$signature = $_SERVER['HTTP_X_PH_SIGNATURE'];
+$payload = file_get_contents('php://input');
+$signingKey = getenv('POSTHOOK_SIGNING_KEY');
+
+$expected = hash_hmac('sha256', $payload, $signingKey);
+
+if (!hash_equals($expected, $signature)) {
+    http_response_code(401);
+    exit('Invalid signature');
+}
+
+$json = json_decode($payload, true);
+$data = $json['data'];
+// Process...
+http_response_code(200);
+?>
+```
+
+</CodeGroup>

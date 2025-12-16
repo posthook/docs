@@ -1,0 +1,36 @@
+---
+title: 'Dead Letter Queue'
+description: 'Manage and replay failed webhooks'
+---
+
+The List Hooks endpoint can function as a Dead Letter Queue (DLQ). You can fetch all failed hooks within a specific time range, process them, and then delete them.
+
+## Workflow
+
+1.  **List Failed Hooks**: Use `status=failed` and filters like `postAtAfter` (e.g., "yesterday").
+    ```bash
+    GET /hooks?status=failed&postAtAfter=2024-01-01T00:00:00Z
+    ```
+2.  **Process**: Iterate through the list and handle the failures (e.g., log them, alert a team, or manually fix the data).
+3.  **Delete**: Once processed, delete the hook to remove it from the queue.
+    ```bash
+    DELETE /hooks/{id}
+    ```
+
+<Tip>
+  **Automate this with Sequences**: You can set up a recurring [Sequence Pattern](/patterns/recurring-tasks) to trigger your DLQ processing endpoint every day.
+</Tip>
+
+## Bulk Retry
+
+If you had a temporary outage (e.g., your database was down), you can batch retry failures instead of deleting them.
+
+1.  **List Failed Hooks** (as above).
+2.  **Extract IDs**: Collect the `id` from each hook.
+3.  **Batch Retry**:
+    ```bash
+    POST /hooks/retryIDs
+    {
+      "hookIDs": ["hook_1", "hook_2", "hook_3"]
+    }
+    ```

@@ -1,0 +1,318 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Posthook API",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "https://api.posthook.io/v1"
+        }
+    ],
+    "components": {
+        "schemas": {
+            "Hook": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "path": {
+                        "type": "string"
+                    },
+                    "domain": {
+                        "type": "string"
+                    },
+                    "data": {
+                        "type": "object"
+                    },
+                    "postAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "posted",
+                            "failed",
+                            "retrying"
+                        ]
+                    },
+                    "postDurationSeconds": {
+                        "type": "number"
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "attempts": {
+                        "type": "integer"
+                    },
+                    "failureError": {
+                        "type": "string"
+                    },
+                    "tryAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "wasNotified": {
+                        "type": "boolean"
+                    },
+                    "sequenceData": {
+                        "$ref": "#/components/schemas/HookSequenceData"
+                    }
+                }
+            },
+            "HookSequenceData": {
+                "type": "object",
+                "properties": {
+                    "sequenceID": {
+                        "type": "string"
+                    },
+                    "stepName": {
+                        "type": "string"
+                    },
+                    "sequenceLastRunAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            }
+        },
+        "securitySchemes": {
+            "apiKey": {
+                "type": "apiKey",
+                "name": "X-API-Key",
+                "in": "header"
+            }
+        }
+    },
+    "security": [
+        {
+            "apiKey": []
+        }
+    ],
+    "paths": {
+        "/hooks": {
+            "get": {
+                "summary": "List Hooks",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 10
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 0
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "pending",
+                                "posted",
+                                "failed",
+                                "retrying"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "postAtBefore",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "description": "Filter hooks scheduled before this timestamp"
+                    },
+                    {
+                        "name": "postAtAfter",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "description": "Filter hooks scheduled after this timestamp"
+                    },
+                    {
+                        "name": "createdAtBefore",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "description": "Filter hooks created before this timestamp"
+                    },
+                    {
+                        "name": "createdAtAfter",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "description": "Filter hooks created after this timestamp"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of hooks",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/Hook"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "summary": "Schedule Hook",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "path",
+                                    "postAt",
+                                    "data"
+                                ],
+                                "properties": {
+                                    "path": {
+                                        "type": "string",
+                                        "example": "/webhooks/reminder"
+                                    },
+                                    "postAt": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "description": "ISO-8601 Timestamp. Timestamps in the past are delivered immediately.",
+                                        "example": "2025-12-14T12:00:00Z",
+                                        "default": "2025-12-14T12:00:00Z"
+                                    },
+                                    "data": {
+                                        "type": "object",
+                                        "example": {
+                                            "user_id": "123"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Hook scheduled",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Hook"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/hooks/{id}": {
+            "get": {
+                "summary": "Get Hook",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Hook details",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Hook"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "summary": "Cancel Hook",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Hook cancelled"
+                    }
+                }
+            }
+        },
+        "/hooks/retryIDs": {
+            "post": {
+                "summary": "Retry Hooks",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "projectID",
+                                    "hookIDs"
+                                ],
+                                "properties": {
+                                    "projectID": {
+                                        "type": "string"
+                                    },
+                                    "hookIDs": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Retries queued"
+                    }
+                }
+            }
+        }
+    }
+}

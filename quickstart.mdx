@@ -1,0 +1,107 @@
+---
+title: 'Quickstart'
+description: 'Start scheduling webhooks in under 2 minutes'
+---
+
+This guide will show you how to set up Posthook, connect your local environment, and send your first Scheduled Hook.
+
+<Tip>
+  Prefer an interactive guide? You can follow this same walkthrough interactively in the [Posthook Dashboard](https://posthook.io/app/home).
+</Tip>
+
+## 1. Install & Login
+
+Use the CLI to connect your local development server to Posthook. This allows you to receive webhooks locally without setting up tunneling tools like ngrok.
+
+<CodeGroup>
+
+```bash npm
+npx posthook login
+```
+
+```bash yarn
+yarn dlx posthook login
+```
+
+```bash pnpm
+pnpm dlx posthook login
+```
+
+</CodeGroup>
+
+You will be prompted to enter your **API Secret Key**. You can find this in the **Settings** page of your project in the [Dashboard](https://posthook.io/app/home).
+
+## 2. Start the Listener
+
+Start the Posthook listener to forward webhooks to your local application.
+
+```bash
+npx posthook listen --forward http://localhost:3000
+```
+
+Replace `http://localhost:3000` with the base URL of your local server.
+
+<Note>
+  The listener connects to Posthook via WebSocket. It receives webhooks and forwards them to your specified local URL.
+</Note>
+
+## 3. Send a Test Hook
+
+In a new terminal window, schedule a test webhook to be sent immediately.
+
+```bash
+curl -X POST https://api.posthook.io/v1/hooks \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: <YOUR_API_KEY>" \
+  -d '{
+    "path": "/api/webhooks",
+    "postAt": "'$(date -v+5S -u +"%Y-%m-%dT%H:%M:%SZ")'",
+    "data": {
+      "user_id": "usr_123",
+      "reminder_id": "rem_456"
+    }
+  }'
+```
+
+You can find your API Key in the **Settings** page of your project in the [Dashboard](https://posthook.io/app/home).
+
+### Verification
+
+Check your `posthook listen` terminal. You should see:
+
+```
+2024-01-01 12:00:00 [200 OK] POST /api/webhooks
+```
+
+And your local server logs should show the incoming request with the payload:
+
+```json
+{
+  "id": "hook_01H...",
+  "path": "/api/webhooks",
+  "postAt": "2024-01-01T12:00:05Z",
+  "data": {
+    "user_id": "usr_123",
+    "reminder_id": "rem_456"
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Security"
+    icon="shield"
+    href="/essentials/security"
+  >
+    Learn how to verify the `X-Ph-Signature` to ensure requests are genuine.
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api-reference/introduction"
+  >
+    Explore the full API to schedule, list, and manage your hooks.
+  </Card>
+</CardGroup>

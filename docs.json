@@ -1,0 +1,102 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Posthook",
+  "theme": "mint",
+  "openapi": "openapi.json",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
+    "href": "https://posthook.io"
+  },
+  "favicon": "/favicon.svg",
+  "feedback": {
+    "suggestEdit": true,
+    "raiseIssue": true
+  },
+  "colors": {
+    "primary": "#357EDD",
+    "light": "#357EDD",
+    "dark": "#357EDD"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:support@posthook.io"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Dashboard",
+      "href": "https://posthook.io/app/home"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "icon": "book",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "icon": "rocket",
+            "pages": [
+              "index",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Essentials",
+            "icon": "book-open",
+            "pages": [
+              "essentials/authentication",
+              "essentials/hook-fulfillment",
+              "essentials/security",
+              "essentials/sequences",
+              "essentials/project-settings",
+              "essentials/cli"
+            ]
+          },
+          {
+            "group": "Patterns",
+            "icon": "shapes",
+            "pages": [
+              "patterns/user-engagement",
+              "patterns/auto-expiry",
+              "patterns/polling",
+              "patterns/debouncing",
+              "patterns/rate-limiting",
+              "patterns/dead-letter-queue",
+              "patterns/auditing",
+              "patterns/recurring-tasks"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "icon": "code",
+        "groups": [
+          {
+            "group": "Endpoints",
+            "icon": "square-code",
+            "pages": [
+              "api-reference/introduction",
+              "api-reference/endpoint/create-hook",
+              "api-reference/endpoint/get-hook",
+              "api-reference/endpoint/list-hooks",
+              "api-reference/endpoint/delete-hook",
+              "api-reference/endpoint/retry-hooks"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/posthook",
+      "github": "https://github.com/posthook"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+---
+title: 'Retry Hooks'
+openapi: 'POST /hooks/retryIDs'
+---
+
+Manually retry a batch of failed hooks.
+
+## Parameters
+
+<ParamField body="projectID" type="string" required>
+  The ID of the project.
+</ParamField>
+
+<ParamField body="hookIDs" type="array" required>
+  An array of hook IDs to retry.
+</ParamField>
+
+## Example
+
+```json
+{
+  "projectID": "proj_123",
+  "hookIDs": ["hook_abc", "hook_def"]
+}
+```

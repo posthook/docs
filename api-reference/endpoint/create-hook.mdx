@@ -1,0 +1,28 @@
+---
+title: 'Schedule Hook'
+openapi: 'POST /hooks'
+---
+
+Schedule a new webhook to be sent at a specific time in the future (or immediately).
+
+<Tip>
+  **Pro Tip**: To verify immediate delivery, use a timestamp in the past (e.g. yesterday).
+</Tip>
+
+## URL Resolution
+
+When you schedule a hook, you provide a `path` (e.g. `/webhooks/remind`).
+
+Posthook constructs the full destination URL by combining your **Project Domain** with this `path`.
+
+> **Destination URL** = `Project Domain` + `path`
+
+For example, if your Project Domain is `api.myapp.com` and you schedule a hook with path `/webhooks/payment`, we will POST to `https://api.myapp.com/webhooks/payment` (Posthook enforces HTTPS).
+
+
+## Usage Patterns
+- [**User Engagement**](/patterns/user-engagement): Schedule event reminders and abandoned cart recovery emails.
+- [**Auto-Expiry (TTL)**](/patterns/auto-expiry): Schedule the deletion of temporary resources (e.g. shared links) at the moment of creation.
+- [**Recursive Polling**](/patterns/polling): Periodically check a long-running job (e.g. video encoding) until it completes.
+- [**Debouncing**](/patterns/debouncing): Prevent duplicate processing by verifying event freshness.
+- [**Load Smoothing**](/patterns/rate-limiting): Distribute a large batch of requests over time to avoid overwhelming your API.

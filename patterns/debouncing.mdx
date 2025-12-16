@@ -1,0 +1,56 @@
+---
+title: 'Debouncing'
+description: 'Prevent duplicate actions by verifying event freshness'
+---
+
+When events happen in rapid succession (e.g., a user saving a document multiple times), you often only want to perform a reaction (like sinking to an external API) once the activity stops.
+
+Instead of cancelling previous hooks (which requires tracking IDs), you can use a **Stale Check** pattern.
+
+## Workflow
+
+1.  **Schedule**: On every event, schedule a hook for `X` minutes in the future. Pass the current timestamp.
+2.  **Verify**: When the hook fires, compare the passed timestamp with the resource's current `updatedAt`.
+3.  **Discard**: If the resource is newer than the event, it means a subsequent event occurred. Discard this hook.
+
+## Example: Sync to Salesforce
+
+Sync a user profile to Salesforce 5 minutes after their last edit.
+
+```javascript
+/* 1. Schedule */
+function onUserProfileUpdate(user) {
+  // Always schedule the sync for 5 minutes later
+  // Pass the creation time of THIS specific event
+  posthook.schedule({
+    path: '/webhooks/sync/salesforce',
+    postAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    data: {
+      userId: user.id,
+      triggeredAt: new Date().toISOString()
+    }
+  });
+}
+
+/* 2. Handle */
+app.post('/webhooks/sync/salesforce', async (req, res) => {
+  // Verify the signature (see 'Hook Fulfillment' for implementation)
+  if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
+
+  const { userId, triggeredAt } = req.body.data;
+  const user = await db.getUser(userId);
+
+  // STALE CHECK:
+  // If the user record has been updated SINCE this hook was scheduled,
+  // then a newer hook exists in the queue. We can safely skip this one.
+  if (new Date(user.updatedAt) > new Date(triggeredAt)) {
+    return res.status(200).send('Stale request, skipping');
+  }
+
+  // If timestamps match (or are very close), this is the latest action.
+  await salesforce.sync(user);
+  res.status(200).send('Synced');
+});
+```
+
+This ensures that if a user updates their profile 10 times in one minute, only the **last** hook will actually trigger the sync. The previous 9 will detect they are "stale" and exit immediately.

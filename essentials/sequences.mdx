@@ -1,0 +1,48 @@
+---
+title: 'Sequences'
+description: 'Chain hooks together with dependencies'
+---
+
+Sequences allow you to define a workflow of multiple hooks that run in a specific order. You can define dependencies between steps, ensuring `Step B` only runs after `Step A` succeeds.
+
+## How it works
+
+A sequence is defined by:
+1. **Start Time**: When the first step(s) should kick off.
+2. **Interval**: How often the sequence repeats (optional).
+3. **Steps**: A collection of hooks to fire.
+
+## Configuration
+
+Sequences are configured using YAML. Each key in the YAML object represents a step name.
+
+### Example
+
+Here is a common pattern for a data synchronization workflow:
+
+```yaml
+syncData:
+  path: /webhooks/posthook/sync
+cleanupOldRecords:
+  path: /webhooks/posthook/cleanup
+notify:
+  path: /webhooks/posthook/notify
+  requires:
+    - syncData
+    - cleanupOldRecords
+```
+
+### Breakdown
+- **syncData** and **cleanupOldRecords** have no `requires` field, so they start immediately in parallel.
+- **notify** waits until *both* `syncData` and `cleanupOldRecords` have successfully completed (returned 200 OK).
+- If any dependency fails, the dependent steps (like `notify`) will not run.
+
+## Managing Sequences
+
+You can create and manage sequences directly in the [Dashboard](https://posthook.io/app/home).
+
+## Usage Patterns
+
+- [**Dead Letter Queue**](/patterns/dead-letter-queue): Handle hooks that have failed all retries.
+- [**Auditing**](/patterns/auditing): Double-check important hooks ran.
+- [**Recurring Tasks**](/patterns/recurring-tasks): Schedule daily reports, health checks, or database maintenance.

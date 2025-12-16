@@ -1,0 +1,32 @@
+---
+title: 'Authentication'
+description: 'How to authenticate your API requests'
+---
+
+The Posthook API uses API keys to authenticate requests. You can view and manage your API keys in the **Settings** page of your project in the [Dashboard](https://posthook.io/app/home).
+
+## X-API-Key Header
+
+Authentication to the API is performed via the `X-API-Key` header.
+
+```bash
+X-API-Key: <YOUR_API_KEY>
+```
+
+<Note>
+  **Project Scoping**: Each API Key is tied to a **specific project**. All API requests are automatically scoped to that project. You cannot access resources from Project B while using an API Key from Project A.
+</Note>
+
+<Warning>
+  Although some APIs use `Authorization: Bearer <token>`, Posthook expects the key directly in the `X-API-Key` header.
+</Warning>
+
+## Example Request
+
+```bash
+curl "https://api.posthook.io/v1/hooks" \
+  -H "X-API-Key: ph_test_..." \
+  -H "Content-Type: application/json"
+```
+
+Your API keys carry many privileges, so be sure to keep them secure! Do not share your secret API keys in publicly accessible areas such as GitHub, client-side code, etc.

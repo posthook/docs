@@ -1,0 +1,81 @@
+---
+title: Welcome to Posthook
+description: 'Schedule webhooks easily. We handle the infrastructure, you handle the logic.'
+---
+
+
+
+
+## What is Posthook?
+
+Posthook is the webhook scheduling infrastructure for developers. We handle the reliability, retries, and timing so you can focus on your business logic.
+
+<CodeGroup>
+```bash Schedule a Hook
+curl -X POST https://api.posthook.io/v1/hooks \
+  -H "X-API-Key: <YOUR_KEY>" \
+  -d '{
+    "path": "/webhooks/remind",
+    "postAt": "2025-01-01T12:00:00Z",
+    "data": { "user_id": "123" }
+  }'
+```
+</CodeGroup>
+
+## Core Features
+
+Posthook is built around two primary use cases:
+
+### 1. One-Time Callbacks
+Schedule HTTP requests to be delivered at a specific time in the future. Perfect for:
+- sending email reminders
+- delayed job processing
+- trial expiration checks
+
+[**Start Scheduling**](/api-reference/endpoint/create-hook)
+
+### 2. Recurring Workflows (Sequences)
+Chain multiple hooks together to create complex, time-based workflows. Sequences allow you to:
+- run steps in parallel or series
+- handle dependencies (Step B waits for Step A)
+- schedule recurring crons
+
+[**Learn about Sequences**](/essentials/sequences)
+
+## Platform Features
+
+<CardGroup cols={2}>
+  <Card title="Reliability" icon="shield-check" href="/essentials/hook-fulfillment">
+    Automatic retries with exponential backoff.
+  </Card>
+  <Card title="Security" icon="fingerprint" href="/essentials/security">
+    Cryptographic signatures on every request.
+  </Card>
+  <Card title="Local Dev" icon="terminal" href="/essentials/cli">
+    Test hooks locally with our CLI.
+  </Card>
+  <Card title="Dashboard" icon="eye" href="https://posthook.io/app/home">
+    View recent activity and upcoming hooks in real-time.
+  </Card>
+</CardGroup>
+
+## Getting Started
+
+Ready to start scheduling?
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart"
+    icon="bolt"
+    href="/quickstart"
+  >
+    Send your first scheduled webhook in under 2 minutes.
+  </Card>
+  <Card
+    title="CLI Tool"
+    icon="terminal"
+    href="/essentials/cli"
+  >
+    Develop locally without exposing your localhost to the internet.
+  </Card>
+</CardGroup>

@@ -1,0 +1,15 @@
+---
+title: 'List Hooks'
+openapi: 'GET /hooks'
+---
+
+List your webhooks.
+
+## Usage Patterns
+
+Common patterns for this endpoint include:
+- [**Dead Letter Queue**](/patterns/dead-letter-queue): Process failures within a specific time window.
+- [**Bulk Retry**](/patterns/dead-letter-queue#bulk-retry): Batch retry failed hooks.
+- [**Auditing**](/patterns/auditing): Reconcile Posthook delivery logs with your internal records.
+
+

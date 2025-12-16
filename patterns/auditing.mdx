@@ -1,0 +1,15 @@
+---
+title: 'Auditing'
+description: 'Reconcile your internal state with delivery records'
+---
+
+You can use the List Hooks API to reconcile your internal state with Posthook's delivery records. This is useful for verifying that critical financial or compliance events were definitely sent.
+
+## Workflow
+
+1.  **List Completed Hooks**:
+    ```bash
+    GET /hooks?status=posted&postAtAfter=2024-01-01T00:00:00Z
+    ```
+2.  **Verify**: Iterate through the list and compare against your own transaction logs.
+3.  **Alert**: Flag any discrepancies (e.g., a transaction marked "processed" in your DB but missing a corresponding webhook).
