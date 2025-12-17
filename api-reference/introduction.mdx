@@ -3,7 +3,7 @@ title: 'Introduction'
 description: 'Posthook API Reference'
 ---
 
-The Posthook API is organized around REST. Our API has predictable resource-oriented URLs, accepts JSON-encoded request bodies, returns JSON-encoded responses, and uses standard HTTP response codes, authentication, and verbs.
+The Posthook API follows REST conventions with predictable, resource-oriented URLs. It accepts JSON-encoded request bodies, returns JSON-encoded responses, and uses standard HTTP response codes, authentication, and verbs.
 
 ## Base URL
 
@@ -29,9 +29,9 @@ Posthook uses standard HTTP response codes to indicate the success or failure of
 
 | Code | Meaning |
 | --- | --- |
-| `200` | **OK** - The request resulted in a success. |
+| `200` | **OK** - Request succeeded. |
 | `201` | **Created** - The resource was successfully created. |
-| `400` | **Bad Request** - The request was invalid (e.g. missing required fields). |
+| `400` | **Bad Request** - Invalid request (e.g., missing required fields). |
 | `401` | **Unauthorized** - The `X-API-Key` header is missing or invalid. |
 | `404` | **Not Found** - The requested resource (e.g. Hook ID) does not exist. |
 | `429` | **Too Many Requests** - You have exceeded your rate limits. |

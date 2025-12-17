@@ -3,7 +3,7 @@ title: 'Recursive Polling'
 description: 'Turn any polling API into an async webhook'
 ---
 
-If you depend on a 3rd-party API that processes data (like video encoding or AI generation) but *doesn't* offer webhooks, you usually have to run a cron job to poll for status.
+If you use a third-party API that processes data (like video encoding or AI generation) but doesn't offer webhooks, you usually have to run a cron job to poll for status.
 
 With Posthook, you can create a "self-healing" loop that checks the status and reschedules itself if the job isn't done yet.
 
@@ -30,7 +30,7 @@ async function startVideoEncoding(videoFile) {
 
 /* 2. Handle */
 app.post('/webhooks/check-status', async (req, res) => {
-  // Verify the signature (see 'Hook Fulfillment' for implementation)
+  // Verify signature (see Hook Fulfillment)
   if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
 
   const { jobId } = req.body.data;

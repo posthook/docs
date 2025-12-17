@@ -3,7 +3,7 @@ title: 'User Engagement'
 description: 'Schedule reminders, follow-ups, and recovery emails'
 ---
 
-Posthook is perfect for powering user engagement workflows that require timing delays, such as reminders or abandoned cart recovery.
+Posthook powers user engagement workflows that require timing delays, such as reminders or abandoned cart recovery.
 
 ## Event Reminders
 
@@ -30,7 +30,7 @@ function onWebinarBooking(booking) {
 
 /* 2. Handle */
 app.post('/webhooks/send-email', async (req, res) => {
-  // Verify the signature (see 'Hook Fulfillment' for implementation)
+  // Verify signature (see Hook Fulfillment)
   if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
 
   const { bookingId } = req.body.data;
@@ -78,7 +78,7 @@ function onAddToCart(cart) {
 
 /* 2. Handle & Verify */
 app.post('/webhooks/cart/abandoned', async (req, res) => {
-  // Verify the signature (see 'Hook Fulfillment' for implementation)
+  // Verify signature (see Hook Fulfillment)
   if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
 
   const { cartId } = req.body.data;

@@ -9,7 +9,7 @@ The List Hooks endpoint can function as a Dead Letter Queue (DLQ). You can fetch
 
 1.  **List Failed Hooks**: Use `status=failed` and filters like `postAtAfter` (e.g., "yesterday").
     ```bash
-    GET /hooks?status=failed&postAtAfter=2024-01-01T00:00:00Z
+    GET /hooks?status=failed&postAtAfter=2025-01-01T00:00:00Z
     ```
 2.  **Process**: Iterate through the list and handle the failures (e.g., log them, alert a team, or manually fix the data).
 3.  **Delete**: Once processed, delete the hook to remove it from the queue.

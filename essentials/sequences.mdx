@@ -3,12 +3,12 @@ title: 'Sequences'
 description: 'Chain hooks together with dependencies'
 ---
 
-Sequences allow you to define a workflow of multiple hooks that run in a specific order. You can define dependencies between steps, ensuring `Step B` only runs after `Step A` succeeds.
+Sequences let you define workflows where multiple hooks run in a specific order. You can define dependencies between steps, ensuring `Step B` only runs after `Step A` succeeds.
 
 ## How it works
 
 A sequence is defined by:
-1. **Start Time**: When the first step(s) should kick off.
+1. **Start Time**: When the first step(s) should start.
 2. **Interval**: How often the sequence repeats (optional).
 3. **Steps**: A collection of hooks to fire.
 
@@ -34,8 +34,8 @@ notify:
 
 ### Breakdown
 - **syncData** and **cleanupOldRecords** have no `requires` field, so they start immediately in parallel.
-- **notify** waits until *both* `syncData` and `cleanupOldRecords` have successfully completed (returned 200 OK).
-- If any dependency fails, the dependent steps (like `notify`) will not run.
+- **notify** waits until *both* `syncData` and `cleanupOldRecords` have successfully completed (returned a 2xx response).
+- If any dependency fails, dependent steps do not run.
 
 ## Managing Sequences
 

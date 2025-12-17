@@ -3,7 +3,7 @@ title: 'Debouncing'
 description: 'Prevent duplicate actions by verifying event freshness'
 ---
 
-When events happen in rapid succession (e.g., a user saving a document multiple times), you often only want to perform a reaction (like sinking to an external API) once the activity stops.
+When events fire in rapid succession, such as a user saving a document repeatedly, you often only want to perform a reaction (like syncing to an external API) once the activity stops.
 
 Instead of cancelling previous hooks (which requires tracking IDs), you can use a **Stale Check** pattern.
 
@@ -34,7 +34,7 @@ function onUserProfileUpdate(user) {
 
 /* 2. Handle */
 app.post('/webhooks/sync/salesforce', async (req, res) => {
-  // Verify the signature (see 'Hook Fulfillment' for implementation)
+  // Verify signature (see Hook Fulfillment)
   if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
 
   const { userId, triggeredAt } = req.body.data;

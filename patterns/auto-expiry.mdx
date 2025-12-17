@@ -3,7 +3,7 @@ title: 'Auto-Expiry (TTL)'
 description: 'Automatically clean up temporary resources'
 ---
 
-Managing the lifecycle of temporary resources (like shareable links, export files, or beta accounts) is often overlooked. Instead of running a nightly "cleanup cron," you can schedule the deletion at the exact moment of creation.
+Temporary resources like shareable links, export files, or beta accounts need lifecycle management. Instead of running a nightly cleanup job, you can schedule the deletion at the exact moment of creation.
 
 ## Workflow
 
@@ -30,7 +30,7 @@ async function createShareableLink(fileId) {
 
 /* 2. Handle */
 app.post('/webhooks/expire-link', async (req, res) => {
-  // Verify the signature (see 'Hook Fulfillment' for implementation)
+  // Verify signature (see Hook Fulfillment)
   if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
 
   const { token } = req.body.data;

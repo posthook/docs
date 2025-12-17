@@ -3,28 +3,28 @@ title: 'Hook Fulfillment'
 description: 'How we deliver your Scheduled Hooks'
 ---
 
-When a scheduled time arrives, Posthook makes an HTTP POST request to your destination.
+When the scheduled time arrives, Posthook sends an HTTP POST request to your endpoint.
 
-The destination URL is constructed by combining your **Project Domain** (configured in settings) with the **Path** specified when scheduling the hook.
+The destination URL combines your **Project Domain** (configured in settings) with the **Path** specified when scheduling the hook.
 
 > `api.myapp.com` (Domain) + `/webhooks/remind` (Path) = `https://api.myapp.com/webhooks/remind` (HTTPS is enforced)
 
 ## The Request
 
-Posthook sends a `POST` request with a wrapper object containing your data and metadata about the scheduling.
+Posthook sends a `POST` request containing your data along with scheduling metadata.
 
 ```json
 {
   "id": "hook_01H...",
   "path": "/webhooks/remind",
-  "postAt": "2024-01-01T12:00:00Z",
-  "postedAt": "2024-01-01T12:00:00.123Z",
+  "postAt": "2025-01-01T12:00:00Z",
+  "postedAt": "2025-01-01T12:00:00.123Z",
   "data": {
     "user_id": "usr_123",
     "reminder_id": "rem_456"
   },
-  "createdAt": "2023-12-31T12:00:00Z",
-  "updatedAt": "2023-12-31T12:00:00Z"
+  "createdAt": "2024-12-31T12:00:00Z",
+  "updatedAt": "2024-12-31T12:00:00Z"
 }
 ```
 
@@ -38,7 +38,7 @@ Posthook sends a `POST` request with a wrapper object containing your data and m
 
 ### Retries
 
-If your endpoint returns a non-200 status code, or times out (timeout is 10 seconds), Posthook will retry the delivery based on your project's retry configuration.
+If your endpoint returns a non-2xx status code or times out (10-second limit), Posthook retries the delivery based on your project's retry configuration.
 
 You can configure:
 - **Max Retries**: 1 to 10 attempts.
@@ -47,7 +47,7 @@ You can configure:
 
 ### Handling Long-Running Tasks
 
-Posthook has a strict **10-second timeout** for webhook delivery. If your task takes longer than 10 seconds (e.g., generating a PDF, processing a video), your request will time out and be retried.
+Posthook enforces a **10-second timeout** on webhook delivery. If your task takes longer than 10 seconds (e.g., generating a PDF, processing a video), your request will time out and be retried.
 
 To handle this, you should implement an **Async Pattern**:
 1.  Receive the webhook.
@@ -61,7 +61,7 @@ To handle this, you should implement an **Async Pattern**:
 
 ## Verifying Signatures
 
-To ensure that the request comes from Posthook and not a malicious actor, you must verify the signature.
+Verify the signature to confirm requests originate from Posthook.
 
 You will need your **Signing Key**, found in **Project Settings** in the [Dashboard](https://posthook.io/app/home).
 

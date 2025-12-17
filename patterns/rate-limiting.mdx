@@ -3,7 +3,7 @@ title: 'Rate Limiting'
 description: 'Smooth out traffic spikes using Posthook'
 ---
 
-If you need to process a large number of items (e.g., 10,000) but your API can only handle a limited rate (e.g., 100 requests per second), you can use Posthook to "smooth" the load.
+When processing large batches (e.g., 10,000 items) but your API can only handle a limited rate (e.g., 100 requests per second), you can use Posthook to smooth the load.
 
 Instead of processing everything immediately or setting `postAt` to `now` for all items, you can increment the timestamp for each batch.
 
@@ -32,7 +32,7 @@ items.forEach((item, index) => {
 
 /* 2. Handle */
 app.post('/webhooks/process', async (req, res) => {
-  // Verify the signature (see 'Hook Fulfillment' for implementation)
+  // Verify signature (see Hook Fulfillment)
   if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
 
   const item = req.body.data;

@@ -8,7 +8,7 @@ You can configure your project's behavior in the **Settings** tab of the dashboa
 ## General
 
 - **Name**: The display name of your project.
-- **Domain**: The base domain for your webhook endpoints. This is only optional for local development projects that don't have a domain yet. When set, you can use relative paths when scheduling hooks.
+- **Domain**: The base domain for your webhook endpoints. Optional for local development projects without a domain. When set, you can use relative paths when scheduling hooks.
 - **Custom Authorization Header**: An optional value (e.g., `Bearer my-token`) that Posthook will include in the `Authorization` header of every request.
 
 ## Retries
@@ -24,11 +24,11 @@ Control how Posthook handles failures (non-200 responses or timeouts).
 
 ## Notifications
 
-Get notified when a hook fails permanently (i.e., fails all retry attempts).
+Get notified when a hook exhausts all retry attempts.
 
 1. Go to **Settings > Notifications**.
 2. Add an email address.
-3. Posthook will send an email alert whenever a hook in this project reaches its final failure state.
+3. Posthook sends an email alert when any hook in this project exhausts its retries.
 
 ## WebSocket Delivery (Beta)
 

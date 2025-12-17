@@ -3,15 +3,15 @@ title: 'Quickstart'
 description: 'Start scheduling webhooks in under 2 minutes'
 ---
 
-This guide will show you how to set up Posthook, connect your local environment, and send your first Scheduled Hook.
+This guide walks you through setting up Posthook, connecting your local environment, and sending your first scheduled hook.
 
 <Tip>
   Prefer an interactive guide? You can follow this same walkthrough interactively in the [Posthook Dashboard](https://posthook.io/app/home).
 </Tip>
 
-## 1. Install & Login
+## 1. Log In
 
-Use the CLI to connect your local development server to Posthook. This allows you to receive webhooks locally without setting up tunneling tools like ngrok.
+Connect your local development server to Posthook using the CLI. This lets you receive webhooks locally without tunneling tools like ngrok.
 
 <CodeGroup>
 
@@ -47,7 +47,7 @@ Replace `http://localhost:3000` with the base URL of your local server.
 
 ## 3. Send a Test Hook
 
-In a new terminal window, schedule a test webhook to be sent immediately.
+In a new terminal, schedule a test webhook to fire in 5 seconds.
 
 ```bash
 curl -X POST https://api.posthook.io/v1/hooks \
@@ -70,7 +70,7 @@ You can find your API Key in the **Settings** page of your project in the [Dashb
 Check your `posthook listen` terminal. You should see:
 
 ```
-2024-01-01 12:00:00 [200 OK] POST /api/webhooks
+2025-01-01 12:00:00 [200 OK] POST /api/webhooks
 ```
 
 And your local server logs should show the incoming request with the payload:
@@ -79,7 +79,7 @@ And your local server logs should show the incoming request with the payload:
 {
   "id": "hook_01H...",
   "path": "/api/webhooks",
-  "postAt": "2024-01-01T12:00:05Z",
+  "postAt": "2025-01-01T12:00:05Z",
   "data": {
     "user_id": "usr_123",
     "reminder_id": "rem_456"

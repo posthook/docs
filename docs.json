@@ -2,17 +2,12 @@
   "$schema": "https://mintlify.com/docs.json",
   "name": "Posthook",
   "theme": "mint",
-  "openapi": "openapi.json",
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg",
     "href": "https://posthook.io"
   },
   "favicon": "/favicon.svg",
-  "feedback": {
-    "suggestEdit": true,
-    "raiseIssue": true
-  },
   "colors": {
     "primary": "#357EDD",
     "light": "#357EDD",
@@ -39,7 +34,6 @@
         "groups": [
           {
             "group": "Getting Started",
-            "icon": "rocket",
             "pages": [
               "index",
               "quickstart"
@@ -47,7 +41,6 @@
           },
           {
             "group": "Essentials",
-            "icon": "book-open",
             "pages": [
               "essentials/authentication",
               "essentials/hook-fulfillment",
@@ -59,7 +52,6 @@
           },
           {
             "group": "Patterns",
-            "icon": "shapes",
             "pages": [
               "patterns/user-engagement",
               "patterns/auto-expiry",
@@ -79,7 +71,6 @@
         "groups": [
           {
             "group": "Endpoints",
-            "icon": "square-code",
             "pages": [
               "api-reference/introduction",
               "api-reference/endpoint/create-hook",
@@ -91,6 +82,18 @@
           }
         ]
       }
+    ]
+  },
+  "api": {
+    "openapi": "openapi.json"
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity"
     ]
   },
   "footer": {

@@ -1,6 +1,6 @@
 ---
 title: Welcome to Posthook
-description: 'Schedule webhooks easily. We handle the infrastructure, you handle the logic.'
+description: 'Schedule webhooks for exactly when you need them. Reliable delivery with automatic retries.'
 ---
 
 
@@ -8,7 +8,7 @@ description: 'Schedule webhooks easily. We handle the infrastructure, you handle
 
 ## What is Posthook?
 
-Posthook is the webhook scheduling infrastructure for developers. We handle the reliability, retries, and timing so you can focus on your business logic.
+Posthook is a simple API for scheduling webhooks. Set a time, provide a payload, and we deliver it to your endpoint. Full visibility into every hook from the dashboard.
 
 <CodeGroup>
 ```bash Schedule a Hook
@@ -27,18 +27,18 @@ curl -X POST https://api.posthook.io/v1/hooks \
 Posthook is built around two primary use cases:
 
 ### 1. One-Time Callbacks
-Schedule HTTP requests to be delivered at a specific time in the future. Perfect for:
-- sending email reminders
-- delayed job processing
-- trial expiration checks
+Schedule HTTP requests to be delivered at a specific time in the future. Ideal for:
+- Sending email reminders
+- Delayed job processing
+- Trial expiration checks
 
 [**Start Scheduling**](/api-reference/endpoint/create-hook)
 
 ### 2. Recurring Workflows (Sequences)
 Chain multiple hooks together to create complex, time-based workflows. Sequences allow you to:
-- run steps in parallel or series
-- handle dependencies (Step B waits for Step A)
-- schedule recurring crons
+- Run steps in parallel or series
+- Handle dependencies (Step B waits for Step A)
+- Schedule recurring jobs
 
 [**Learn about Sequences**](/essentials/sequences)
 
@@ -46,7 +46,7 @@ Chain multiple hooks together to create complex, time-based workflows. Sequences
 
 <CardGroup cols={2}>
   <Card title="Reliability" icon="shield-check" href="/essentials/hook-fulfillment">
-    Automatic retries with exponential backoff.
+    Automatic retries with configurable backoff.
   </Card>
   <Card title="Security" icon="fingerprint" href="/essentials/security">
     Cryptographic signatures on every request.

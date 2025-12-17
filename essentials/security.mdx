@@ -3,15 +3,15 @@ title: 'Security'
 description: 'Securing your webhook integration'
 ---
 
-Security is paramount when exposing webhook endpoints. Posthook provides tools to ensure that your communication is secure and authenticated.
+Security is critical when exposing webhook endpoints. Posthook provides tools to ensure that your communication is secure and authenticated.
 
 ## Keys
 
 ### API Key
-The **API Key** is used to authenticate *your* requests to the Posthook API (e.g., when scheduling a hook via `POST /hooks`). This key grants full access to your project, so it must be kept secret.
+The **API Key** is used to authenticate *your* requests to the Posthook API (e.g., when scheduling a hook via `POST /hooks`). This key grants full access to your project, so keep it secret.
 
 - **Usage**: Set in the `X-API-Key` header.
-- **Exposure**: Never expose this in client-side code (browsers, mobile apps). safely store it in your backend environment variables.
+- **Exposure**: Never expose this in client-side code (browsers, mobile apps). Store it securely in your backend environment variables.
 
 ### Signing Key
 The **Signing Key** is used to verify that incoming hooks to your endpoint actually came from Posthook.
@@ -21,7 +21,7 @@ The **Signing Key** is used to verify that incoming hooks to your endpoint actua
 
 ## Idempotency
 
-Retries are a core feature of Posthook. This means that if your server hangs or returns an error, we will send the same hook again.
+Posthook automatically retries failed deliveries. If your server hangs or returns an error, the same hook is sent again.
 
 To prevent processing the same hook twice (e.g., sending a user two emails), your hook handler should be **idempotent**.
 
@@ -45,9 +45,9 @@ When your handler receives the request:
 
 ## Replay Attacks
 
-To protect against replay attacks (where an attacker intercepts a valid payload and re-sends it later), you should verify the timestamp of the request.
+To protect against replay attacks, where an attacker intercepts and resends a valid payload, verify the `postedAt` timestamp in the request body.
 
-The hook payload includes a `postedAt` field (ISO 8601 timestamp).
+This field contains the ISO 8601 timestamp of when Posthook sent the request.
 
 ### Best Practice
 Verify that the `postedAt` timestamp is not too far in the past (e.g., 5 minutes).
