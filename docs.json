@@ -16,6 +16,10 @@
   "navbar": {
     "links": [
       {
+        "label": "Community",
+        "href": "https://github.com/posthook/community"
+      },
+      {
         "label": "Support",
         "href": "mailto:support@posthook.io"
       }
@@ -61,6 +65,12 @@
               "patterns/dead-letter-queue",
               "patterns/auditing",
               "patterns/recurring-tasks"
+            ]
+          },
+          {
+            "group": "Updates",
+            "pages": [
+              "changelog"
             ]
           }
         ]

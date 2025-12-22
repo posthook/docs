@@ -1,0 +1,48 @@
+---
+title: Changelog
+description: Latest updates and improvements to Posthook
+---
+
+<Note>
+  Have a feature request? [Share it on GitHub](https://github.com/posthook/community/discussions/new?category=feature-requests).
+</Note>
+
+---
+
+## December, 2025
+
+**New: Posthook CLI**
+
+Receive webhooks directly to your local machine for development and testing. No tunnels or public URLs required.
+
+```bash
+npx posthook listen --forward http://localhost:8080
+```
+
+- Forward webhooks to any local URL
+- Works behind firewalls and NAT
+- Automatic reconnection on connection loss
+
+**Improved: Failure Notifications**
+
+Smarter failure notifications:
+- Baseline tracking for endpoint error rates
+- Grouped notifications to reduce alert fatigue
+- Follow-up notifications for persistent issues
+- Stale endpoint detection to stop tracking endpoints that have adapted
+- Detailed error classifications
+- Recovery emails
+
+**Improved: Activity Page**
+
+- Real-time refresh showing latest webhook deliveries
+- Faster queries for improved performance
+
+**Improved: Dashboard UX**
+
+- Better navigation and layout
+- Streamlined project settings
+
+---
+
+*More updates coming soon. Check back regularly or follow us on [X](https://x.com/posthook) for announcements.*
