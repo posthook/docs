@@ -47,7 +47,7 @@
             "group": "Essentials",
             "pages": [
               "essentials/authentication",
-              "essentials/hook-fulfillment",
+              "essentials/hook-delivery",
               "essentials/security",
               "essentials/sequences",
               "essentials/project-settings",

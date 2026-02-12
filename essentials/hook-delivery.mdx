@@ -1,0 +1,302 @@
+---
+title: 'Hook Delivery'
+description: 'How we deliver your Scheduled Hooks'
+---
+
+When the scheduled time arrives, Posthook sends an HTTP POST request to your endpoint.
+
+The destination URL combines your **Project Domain** (configured in settings) with the **Path** specified when scheduling the hook.
+
+> `api.myapp.com` (Domain) + `/webhooks/remind` (Path) = `https://api.myapp.com/webhooks/remind` (HTTPS is enforced)
+
+## The Request
+
+Posthook sends a `POST` request containing your data along with scheduling metadata.
+
+```json
+{
+  "id": "hook_01H...",
+  "path": "/webhooks/remind",
+  "postAt": "2025-01-01T12:00:00Z",
+  "postedAt": "2025-01-01T12:00:00.123Z",
+  "data": {
+    "user_id": "usr_123",
+    "reminder_id": "rem_456"
+  },
+  "createdAt": "2024-12-31T12:00:00Z",
+  "updatedAt": "2024-12-31T12:00:00Z"
+}
+```
+
+### Headers
+
+| Header | Description |
+| --- | --- |
+| `Content-Type` | `application/json` |
+| `Posthook-Id` | Unique hook ID (e.g. `e5405623-2c1c-460e-9737-c884f7f59035`) |
+| `Posthook-Timestamp` | Unix timestamp (seconds) of when the hook was posted |
+| `Posthook-Signature` | One or more `v1,<hex>` signatures, space-separated |
+| `X-Ph-Signature` | Legacy HMAC-SHA256 signature (hex-encoded). See [Legacy Header](#legacy-header-x-ph-signature). |
+| `User-Agent` | `Posthook/1.0` |
+
+### Retries
+
+If your endpoint returns a non-2xx status code or times out (10-second limit), Posthook retries the delivery based on your project's retry configuration.
+
+You can configure:
+- **Max Retries**: 1 to 10 attempts.
+- **Retry Delay**: 5 to 60 seconds between attempts.
+
+
+### Handling Long-Running Tasks
+
+Posthook enforces a **10-second timeout** on webhook delivery. If your task takes longer than 10 seconds (e.g., generating a PDF, processing a video), your request will time out and be retried.
+
+To handle this, you should implement an **Async Pattern**:
+1.  Receive the webhook.
+2.  Push the job to an internal background queue (e.g., Redis, SQS, BullMQ).
+3.  **Return `200 OK` immediately** to Posthook.
+4.  Process the job asynchronously in your worker.
+
+<Tip>
+  If you need to track the completion of these long-running tasks (especially if they are 3rd-party APIs), check out the [Recursive Polling](/patterns/polling) pattern.
+</Tip>
+
+## Verifying Signatures
+
+Verify the `Posthook-Signature` header to confirm requests originate from Posthook. This scheme supports dual-key verification during [key rotation](#key-rotation), so you won't drop deliveries when rotating your signing key.
+
+You will need your **Signing Key**, found in **Project Settings** in the [Dashboard](https://posthook.io/app/home).
+
+### How It Works
+
+Every webhook delivery includes three headers:
+
+| Header | Example |
+| --- | --- |
+| `Posthook-Id` | `e5405623-2c1c-460e-9737-c884f7f59035` |
+| `Posthook-Timestamp` | `1700000000` |
+| `Posthook-Signature` | `v1,abc123 v1,def456` |
+
+The signature is computed as follows:
+
+1. Build the signed payload: `{Posthook-Timestamp}.{raw_body}` (dot-separated).
+2. Compute HMAC-SHA256 using your project's signing key.
+3. Hex-encode the result (lowercase, 64 characters).
+4. Prefix with `v1,`.
+
+During [key rotation](#key-rotation), `Posthook-Signature` contains **two** space-separated signatures (one per key). Accept the delivery if **either** signature matches.
+
+### Verification Examples
+
+<CodeGroup>
+
+```javascript Node.js
+const crypto = require('crypto');
+
+function verifyPosthookSignature(body, timestamp, signature, secret) {
+  const payload = `${timestamp}.${body}`;
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex');
+
+  // Check each signature entry (supports dual-key during rotation)
+  return signature.split(' ').some(entry => {
+    const sig = entry.replace('v1,', '');
+    return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+  });
+}
+
+// Usage in an Express handler
+app.post('/webhooks/posthook/send-reminder', (req, res) => {
+  const isValid = verifyPosthookSignature(
+    req.body,                                // raw body (use express.raw())
+    req.headers['posthook-timestamp'],
+    req.headers['posthook-signature'],
+    process.env.POSTHOOK_SIGNING_KEY
+  );
+
+  if (!isValid) return res.status(401).send('Invalid signature');
+
+  const { user_id, reminder_id } = JSON.parse(req.body).data;
+  sendReminder(user_id, reminder_id);
+  res.status(200).send('OK');
+});
+```
+
+```python Python
+import hmac, hashlib
+
+def verify_posthook_signature(body: bytes, timestamp: str, signature: str, secret: str) -> bool:
+    payload = f"{timestamp}.".encode() + body
+    expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
+
+    return any(
+        hmac.compare_digest(entry.removeprefix("v1,"), expected)
+        for entry in signature.split(" ")
+    )
+
+# Usage in a Flask handler
+@app.route('/webhooks/posthook/send-reminder', methods=['POST'])
+def handle_send_reminder():
+    is_valid = verify_posthook_signature(
+        request.get_data(),
+        request.headers.get('Posthook-Timestamp'),
+        request.headers.get('Posthook-Signature'),
+        os.environ['POSTHOOK_SIGNING_KEY']
+    )
+
+    if not is_valid:
+        return 'Invalid signature', 401
+
+    payload = request.json['data']
+    send_reminder(payload['user_id'], payload['reminder_id'])
+    return 'OK', 200
+```
+
+```go Go
+package main
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"strings"
+)
+
+func verifyPosthookSignature(body []byte, timestamp, signature, secret string) bool {
+	payload := []byte(fmt.Sprintf("%s.", timestamp))
+	payload = append(payload, body...)
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(payload)
+	expected := hex.EncodeToString(mac.Sum(nil))
+
+	for _, entry := range strings.Split(signature, " ") {
+		sig := strings.TrimPrefix(entry, "v1,")
+		if hmac.Equal([]byte(sig), []byte(expected)) {
+			return true
+		}
+	}
+	return false
+}
+
+func handleSendReminder(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+
+	isValid := verifyPosthookSignature(
+		body,
+		r.Header.Get("Posthook-Timestamp"),
+		r.Header.Get("Posthook-Signature"),
+		os.Getenv("POSTHOOK_SIGNING_KEY"),
+	)
+
+	if !isValid {
+		http.Error(w, "Invalid signature", http.StatusUnauthorized)
+		return
+	}
+
+	// json.Unmarshal(body, &hook) and process hook.Data...
+	w.WriteHeader(http.StatusOK)
+}
+```
+
+</CodeGroup>
+
+<Tip>
+  For additional replay protection, compare `Posthook-Timestamp` against the current time and reject requests older than your tolerance (e.g. 5 minutes). See [Replay Attacks](/essentials/security#replay-attacks) for details.
+</Tip>
+
+### Key Rotation
+
+Posthook supports zero-downtime key rotation through a grace period:
+
+1. **Before rotation** — `Posthook-Signature` has one `v1,` entry using the active signing key.
+2. **After rotation (grace period)** — `Posthook-Signature` includes **two** `v1,` entries: one for the new active key and one for the retiring key. Accept the delivery if either matches.
+3. **After grace period expires** — The retiring key is excluded. `Posthook-Signature` returns to a single `v1,` entry.
+4. **Revoke (optional)** — You can revoke the retiring key early via the API or dashboard.
+
+<Warning>
+  The legacy `X-Ph-Signature` header switches to the new key **immediately** on rotation with no grace period. This is the primary reason to migrate to `Posthook-Signature`.
+</Warning>
+
+### Legacy Header (X-Ph-Signature)
+
+<Note>
+  `X-Ph-Signature` is deprecated. Migrate to `Posthook-Signature` for dual-key support during key rotation.
+</Note>
+
+`X-Ph-Signature` contains a hex-encoded HMAC-SHA256 of the **raw request body** using the active project signing key.
+
+**Algorithm:**
+1. Compute HMAC-SHA256 of the raw request body using the active signing key.
+2. Hex-encode the result (lowercase, 64 characters).
+
+**Key difference:** `X-Ph-Signature` uses only the active key. When you rotate your signing key, this header immediately switches to the new key — there is no grace period. If your consumer hasn't updated yet, verification will fail until it starts using the new key.
+
+<CodeGroup>
+
+```javascript Node.js (Legacy)
+const crypto = require('crypto');
+
+app.post('/webhooks/posthook/send-reminder', (req, res) => {
+  const signature = req.headers['x-ph-signature'];
+  const expected = crypto
+    .createHmac('sha256', process.env.POSTHOOK_SIGNING_KEY)
+    .update(req.body)   // raw body
+    .digest('hex');
+
+  if (signature !== expected) {
+    return res.status(401).send('Invalid signature');
+  }
+
+  // Process...
+  res.status(200).send('OK');
+});
+```
+
+```python Python (Legacy)
+import hmac, hashlib, os
+from flask import Flask, request
+
+@app.route('/webhooks/posthook/send-reminder', methods=['POST'])
+def handle_send_reminder():
+    signature = request.headers.get('X-Ph-Signature')
+    expected = hmac.new(
+        os.environ['POSTHOOK_SIGNING_KEY'].encode(),
+        request.get_data(),
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(signature, expected):
+        return 'Invalid signature', 401
+
+    # Process...
+    return 'OK', 200
+```
+
+```go Go (Legacy)
+func handleSendReminder(w http.ResponseWriter, r *http.Request) {
+	signature := r.Header.Get("X-Ph-Signature")
+	body, _ := io.ReadAll(r.Body)
+
+	mac := hmac.New(sha256.New, []byte(os.Getenv("POSTHOOK_SIGNING_KEY")))
+	mac.Write(body)
+	expected := hex.EncodeToString(mac.Sum(nil))
+
+	if !hmac.Equal([]byte(signature), []byte(expected)) {
+		http.Error(w, "Invalid signature", http.StatusUnauthorized)
+		return
+	}
+
+	// Process...
+	w.WriteHeader(http.StatusOK)
+}
+```
+
+</CodeGroup>

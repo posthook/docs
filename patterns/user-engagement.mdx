@@ -30,7 +30,7 @@ function onWebinarBooking(booking) {
 
 /* 2. Handle */
 app.post('/webhooks/send-email', async (req, res) => {
-  // Verify signature (see Hook Fulfillment)
+  // Verify signature (see Hook Delivery)
   if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
 
   const { bookingId } = req.body.data;
@@ -78,7 +78,7 @@ function onAddToCart(cart) {
 
 /* 2. Handle & Verify */
 app.post('/webhooks/cart/abandoned', async (req, res) => {
-  // Verify signature (see Hook Fulfillment)
+  // Verify signature (see Hook Delivery)
   if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
 
   const { cartId } = req.body.data;

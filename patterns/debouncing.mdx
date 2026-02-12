@@ -34,7 +34,7 @@ function onUserProfileUpdate(user) {
 
 /* 2. Handle */
 app.post('/webhooks/sync/salesforce', async (req, res) => {
-  // Verify signature (see Hook Fulfillment)
+  // Verify signature (see Hook Delivery)
   if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
 
   const { userId, triggeredAt } = req.body.data;

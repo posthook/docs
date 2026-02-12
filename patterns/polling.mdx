@@ -30,7 +30,7 @@ async function startVideoEncoding(videoFile) {
 
 /* 2. Handle */
 app.post('/webhooks/check-status', async (req, res) => {
-  // Verify signature (see Hook Fulfillment)
+  // Verify signature (see Hook Delivery)
   if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
 
   const { jobId } = req.body.data;
