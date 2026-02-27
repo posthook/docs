@@ -13,6 +13,50 @@ All API requests should be made to:
 https://api.posthook.io/v1
 ```
 
+## SDKs
+
+Official SDKs handle authentication, pagination, and error handling automatically.
+
+<CodeGroup>
+
+```bash TypeScript
+npm install @posthook/node
+```
+
+```bash Python
+pip install posthook-python
+```
+
+```bash Go
+go get github.com/posthook/posthook-go
+```
+
+</CodeGroup>
+
+Initialize the client with your API key:
+
+<CodeGroup>
+
+```typescript TypeScript
+import Posthook from '@posthook/node';
+
+const posthook = new Posthook('phk_your_api_key');
+```
+
+```python Python
+from posthook import Posthook
+
+client = Posthook("phk_your_api_key")
+```
+
+```go Go
+import "github.com/posthook/posthook-go"
+
+client, err := posthook.NewClient("phk_your_api_key")
+```
+
+</CodeGroup>
+
 ## Authentication
 
 The Posthook API uses API keys to authenticate requests.
@@ -34,5 +78,6 @@ Posthook uses standard HTTP response codes to indicate the success or failure of
 | `400` | **Bad Request** - Invalid request (e.g., missing required fields). |
 | `401` | **Unauthorized** - The `X-API-Key` header is missing or invalid. |
 | `404` | **Not Found** - The requested resource (e.g. Hook ID) does not exist. |
+| `413` | **Payload Too Large** - The request body exceeds the maximum size. |
 | `429` | **Too Many Requests** - You have exceeded your rate limits. |
 | `500` | **Internal Server Error** - Something went wrong on our end. |

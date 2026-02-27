@@ -12,16 +12,24 @@ With Posthook, you can create a "self-healing" loop that checks the status and r
 1.  **Schedule**: Trigger the job and schedule the first check.
 2.  **Handle**: Check status. If `pending`, reschedule. If `completed`, process the result.
 
-```javascript
+<CodeGroup>
+
+```typescript TypeScript
+import Posthook from '@posthook/node';
+import { Signatures, SignatureVerificationError } from '@posthook/node';
+
+const posthook = new Posthook(process.env.POSTHOOK_API_KEY);
+const signatures = new Signatures(process.env.POSTHOOK_SIGNING_KEY);
+
 /* 1. Schedule */
 async function startVideoEncoding(videoFile) {
   // 1. Start the job on the 3rd party API
   const job = await transcoderApi.start(videoFile);
 
   // 2. Schedule the first check for 1 minute later
-  posthook.schedule({
+  await posthook.hooks.schedule({
     path: '/webhooks/check-status',
-    postAt: new Date(Date.now() + 60 * 1000).toISOString(),
+    postIn: '1m',
     data: {
       jobId: job.id
     }
@@ -30,30 +38,160 @@ async function startVideoEncoding(videoFile) {
 
 /* 2. Handle */
 app.post('/webhooks/check-status', async (req, res) => {
-  // Verify signature (see Hook Delivery)
-  if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
+  try {
+    const delivery = signatures.parseDelivery(req.body, req.headers);
 
-  const { jobId } = req.body.data;
-  const job = await transcoderApi.get(jobId);
+    const { jobId } = delivery.data;
+    const job = await transcoderApi.get(jobId);
 
-  if (job.status === 'completed') {
-    // DONE: Process the result
-    await db.saveVideo(job.url);
-    return res.status(200).send('Video processed');
+    if (job.status === 'completed') {
+      // DONE: Process the result
+      await db.saveVideo(job.url);
+      return res.status(200).send('Video processed');
+    }
+
+    if (job.status === 'failed') {
+      // FAIL: Handle error (maybe alert team)
+      return res.status(200).send('Job failed');
+    }
+
+    // PENDING: Reschedule check for another minute
+    await posthook.hooks.schedule({
+      path: '/webhooks/check-status',
+      postIn: '1m',
+      data: { jobId }
+    });
+
+    res.status(200).send('Still pending, rescheduled');
+  } catch (err) {
+    if (err instanceof SignatureVerificationError) {
+      return res.status(401).json({ error: err.message });
+    }
+    throw err;
   }
-
-  if (job.status === 'failed') {
-    // FAIL: Handle error (maybe alert team)
-    return res.status(200).send('Job failed');
-  }
-
-  // PENDING: Reschedule check for another minute
-  await posthook.schedule({
-    path: '/webhooks/check-status',
-    postAt: new Date(Date.now() + 60 * 1000).toISOString(),
-    data: { jobId }
-  });
-
-  res.status(200).send('Still pending, rescheduled');
 });
 ```
+
+```python Python
+from posthook import Posthook, SignaturesService, SignatureVerificationError
+from flask import Flask, request, jsonify
+import os
+
+client = Posthook(os.environ["POSTHOOK_API_KEY"])
+app = Flask(__name__)
+signatures = SignaturesService(os.environ["POSTHOOK_SIGNING_KEY"])
+
+# 1. Schedule
+def start_video_encoding(video_file):
+    # 1. Start the job on the 3rd party API
+    job = transcoder_api.start(video_file)
+
+    # 2. Schedule the first check for 1 minute later
+    client.hooks.schedule(
+        "/webhooks/check-status",
+        post_in="1m",
+        data={"job_id": job["id"]}
+    )
+
+# 2. Handle
+@app.route("/webhooks/check-status", methods=["POST"])
+def handle_check_status():
+    try:
+        delivery = signatures.parse_delivery(
+            request.get_data(), dict(request.headers)
+        )
+
+        job_id = delivery.data["job_id"]
+        job = transcoder_api.get(job_id)
+
+        if job["status"] == "completed":
+            # DONE: Process the result
+            db.save_video(job["url"])
+            return "Video processed", 200
+
+        if job["status"] == "failed":
+            # FAIL: Handle error (maybe alert team)
+            return "Job failed", 200
+
+        # PENDING: Reschedule check for another minute
+        client.hooks.schedule(
+            "/webhooks/check-status",
+            post_in="1m",
+            data={"job_id": job_id}
+        )
+
+        return "Still pending, rescheduled", 200
+    except SignatureVerificationError as err:
+        return jsonify(error=err.message), 401
+```
+
+```go Go
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+
+	posthook "github.com/posthook/posthook-go"
+)
+
+var client, _ = posthook.NewClient(os.Getenv("POSTHOOK_API_KEY"))
+var signatures, _ = posthook.NewSignatures(os.Getenv("POSTHOOK_SIGNING_KEY"))
+
+// 1. Schedule
+func startVideoEncoding(videoFile string) {
+	job := transcoderAPI.Start(videoFile)
+
+	client.Hooks.Schedule(context.Background(), &posthook.HookScheduleParams{
+		Path:   "/webhooks/check-status",
+		PostIn: "1m",
+		Data:   map[string]string{"jobId": job.ID},
+	})
+}
+
+// 2. Handle
+func handleCheckStatus(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+
+	delivery, err := signatures.ParseDelivery(body, r.Header)
+	if err != nil {
+		http.Error(w, "Invalid signature", http.StatusUnauthorized)
+		return
+	}
+
+	var data struct {
+		JobID string `json:"jobId"`
+	}
+	json.Unmarshal(delivery.Data, &data)
+
+	job := transcoderAPI.Get(data.JobID)
+
+	if job.Status == "completed" {
+		// DONE: Process the result
+		db.SaveVideo(job.URL)
+		fmt.Fprint(w, "Video processed")
+		return
+	}
+
+	if job.Status == "failed" {
+		// FAIL: Handle error (maybe alert team)
+		fmt.Fprint(w, "Job failed")
+		return
+	}
+
+	// PENDING: Reschedule check for another minute
+	client.Hooks.Schedule(r.Context(), &posthook.HookScheduleParams{
+		Path:   "/webhooks/check-status",
+		PostIn: "1m",
+		Data:   map[string]string{"jobId": data.JobID},
+	})
+
+	fmt.Fprint(w, "Still pending, rescheduled")
+}
+```
+
+</CodeGroup>

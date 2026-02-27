@@ -1,0 +1,136 @@
+---
+title: 'Config-as-Code'
+description: 'Manage project settings declaratively with posthook.toml'
+---
+
+Manage project settings declaratively with a `posthook.toml` file. The CLI syncs this file with your remote project configuration, enabling version control and repeatable environments.
+
+For detailed documentation on each config section, see [Sequences](/essentials/sequences#config-as-code-recommended), [Project Settings](/essentials/project-settings), and [Scheduling](/essentials/scheduling).
+
+## Init
+
+Fetches the current project config from the API and writes it to `posthook.toml` in the current directory.
+
+```bash
+npx posthook init
+```
+
+The CLI prompts for your API key (if not already stored) and saves it to `~/.posthook/config.json`.
+
+## Pull
+
+Downloads the remote config and overwrites the local TOML file. Shows a diff and prompts for confirmation before overwriting.
+
+```bash
+npx posthook pull
+```
+
+**Options**:
+- `--non-interactive`: Skip confirmation prompts.
+
+## Apply
+
+Pushes local TOML changes to the remote project. Shows a diff and prompts for confirmation before applying.
+
+```bash
+npx posthook apply
+```
+
+**Options**:
+- `--dry-run`: Show changes without applying.
+- `--non-interactive`: Skip all confirmation prompts.
+
+The CLI prompts for additional confirmation when:
+- **Reducing retention** (permanently deletes older data)
+- **Deleting sequences** (lists affected sequences by name)
+
+Apply also verifies that the API key's project matches the TOML's `project` field, preventing accidental cross-project changes.
+
+## Diff
+
+Shows pending local changes without applying them.
+
+```bash
+npx posthook diff
+```
+
+## Status
+
+Displays project info, domain, masked API key, and signing key for the current config. No API call is made.
+
+```bash
+npx posthook status
+```
+
+## Validate
+
+Checks TOML syntax and schema locally. No API call is made.
+
+```bash
+npx posthook validate
+```
+
+## TOML format
+
+The config file covers project settings, retry behavior, notifications, retention, and sequences.
+
+```toml
+project = "aaaaaaaa-bbbb-4ccc-9ddd-eeeeeeeeeeee"
+name = "my-app"
+domain = "api.myapp.com"
+
+[retry]
+attempts = 5
+strategy = "exponential"
+delay_seconds = 15
+backoff_factor = 2.0
+max_delay_seconds = 3600
+jitter = true
+
+[notifications]
+channels = ["oncall-slack"]
+group_wait_seconds = 120
+notify_on_recovery = true
+
+[retention]
+days = 60
+
+[[sequences]]
+name = "daily-health-check"
+
+[sequences.schedule]
+frequency = "daily"
+timezone = "America/Chicago"
+time = { hour = 6, minute = 0 }
+
+[sequences.steps.check-api]
+path = "/webhooks/health/api"
+data = { service = "api" }
+
+[sequences.steps.report]
+path = "/webhooks/health/report"
+depends_on = ["check-api"]
+```
+
+The `project` field (UUID) is required. All other sections are optional and default to your project's current settings.
+
+## Multi-environment configs
+
+Use the `--config` flag (or `-c`) to create named config files for different environments.
+
+```bash
+npx posthook init -c staging    # Creates posthook.staging.toml
+npx posthook apply -c staging   # Applies posthook.staging.toml
+npx posthook diff -c dev        # Diffs posthook.dev.toml
+```
+
+Each named config can point to a different project. Credentials are stored per-project in `~/.posthook/config.json`.
+
+## Common flags
+
+| Flag | Description |
+| --- | --- |
+| `-k, --api-key <key>` | Override the stored API key |
+| `-c, --config <name>` | Use a named config file (`posthook.<name>.toml`) |
+
+These flags apply to `init`, `pull`, `apply`, and `diff`. The `status` and `validate` commands only accept `-c, --config`.

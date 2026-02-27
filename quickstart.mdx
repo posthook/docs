@@ -45,17 +45,87 @@ Replace `http://localhost:3000` with the base URL of your local server.
   The listener connects to Posthook via WebSocket. It receives webhooks and forwards them to your specified local URL.
 </Note>
 
-## 3. Send a Test Hook
+## 3. Install the SDK (Optional)
+
+Install an official SDK for a streamlined experience. You can also use `curl` directly.
+
+<CodeGroup>
+
+```bash TypeScript
+npm install @posthook/node
+```
+
+```bash Python
+pip install posthook-python
+```
+
+```bash Go
+go get github.com/posthook/posthook-go
+```
+
+</CodeGroup>
+
+## 4. Send a Test Hook
 
 In a new terminal, schedule a test webhook to fire in 5 seconds.
 
-```bash
+<CodeGroup>
+
+```typescript TypeScript
+import Posthook from '@posthook/node';
+const posthook = new Posthook('phk_your_api_key');
+
+const hook = await posthook.hooks.schedule({
+  path: '/webhooks/posthook/send-reminder',
+  postIn: '5s',
+  data: {
+    user_id: 'usr_123',
+    reminder_id: 'rem_456'
+  }
+});
+
+console.log('Scheduled:', hook.id);
+```
+
+```python Python
+from posthook import Posthook
+
+client = Posthook("phk_your_api_key")
+
+hook = client.hooks.schedule(
+    path="/webhooks/posthook/send-reminder",
+    post_in="5s",
+    data={
+        "user_id": "usr_123",
+        "reminder_id": "rem_456"
+    }
+)
+
+print("Scheduled:", hook.id)
+```
+
+```go Go
+client, _ := posthook.NewClient("phk_your_api_key")
+
+hook, _, _ := client.Hooks.Schedule(context.Background(), &posthook.HookScheduleParams{
+    Path:   "/webhooks/posthook/send-reminder",
+    PostIn: "5s",
+    Data: map[string]string{
+        "user_id":     "usr_123",
+        "reminder_id": "rem_456",
+    },
+})
+
+fmt.Println("Scheduled:", hook.ID)
+```
+
+```bash curl
 curl -X POST https://api.posthook.io/v1/hooks \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: <YOUR_API_KEY>" \
+  -H "X-API-Key: $POSTHOOK_API_KEY" \
   -d '{
-    "path": "/api/webhooks",
-    "postAt": "'$(date -v+5S -u +"%Y-%m-%dT%H:%M:%SZ")'",
+    "path": "/webhooks/posthook/send-reminder",
+    "postIn": "5s",
     "data": {
       "user_id": "usr_123",
       "reminder_id": "rem_456"
@@ -63,39 +133,45 @@ curl -X POST https://api.posthook.io/v1/hooks \
   }'
 ```
 
+</CodeGroup>
+
 You can find your API Key in the **Settings** page of your project in the [Dashboard](https://posthook.io/app/home).
 
 ### Verification
 
-Check your `posthook listen` terminal. You should see:
+Check your `posthook listen` terminal. You should see the hook arrive when it fires:
 
 ```
-2025-01-01 12:00:00 [200 OK] POST /api/webhooks
+2026-01-01 12:00:00 [200 OK] POST /webhooks/posthook/send-reminder
 ```
 
-And your local server logs should show the incoming request with the payload:
+## 5. Check the Dashboard
 
-```json
-{
-  "id": "hook_01H...",
-  "path": "/api/webhooks",
-  "postAt": "2025-01-01T12:00:05Z",
-  "data": {
-    "user_id": "usr_123",
-    "reminder_id": "rem_456"
-  }
-}
-```
+Open the [Activity page](https://posthook.io/app/home) in the Dashboard. You can inspect the full payload, view delivery timing, and check response details for any hook.
 
 ## Next Steps
 
 <CardGroup cols={2}>
   <Card
+    title="How Posthook Works"
+    icon="diagram-project"
+    href="/essentials/how-it-works"
+  >
+    Understand the full hook lifecycle from scheduling to delivery.
+  </Card>
+  <Card
+    title="Receiving Webhooks"
+    icon="inbox"
+    href="/essentials/receiving-webhooks"
+  >
+    Handle deliveries in your app with framework-specific examples.
+  </Card>
+  <Card
     title="Security"
     icon="shield"
     href="/essentials/security"
   >
-    Learn how to verify the `X-Ph-Signature` to ensure requests are genuine.
+    Verify the `Posthook-Signature` to ensure requests are genuine.
   </Card>
   <Card
     title="API Reference"

@@ -1,0 +1,346 @@
+---
+title: 'Scheduling'
+description: 'Schedule hooks in UTC, local time, or relative delay'
+---
+
+Posthook supports three ways to schedule a hook: a UTC timestamp (`postAt`), a local datetime with a timezone (`postAtLocal` + `timezone`), or a relative delay from now (`postIn`).
+
+## UTC scheduling with `postAt`
+
+Provide an [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) timestamp in UTC:
+
+<CodeGroup>
+
+```typescript TypeScript
+const hook = await posthook.hooks.schedule({
+  path: '/webhooks/reminder',
+  postAt: '2026-03-14T18:00:00Z',
+  data: { user_id: 'usr_123' }
+});
+```
+
+```python Python
+hook = client.hooks.schedule(
+    "/webhooks/reminder",
+    post_at="2026-03-14T18:00:00Z",
+    data={"user_id": "usr_123"}
+)
+```
+
+```go Go
+hook, _, err := client.Hooks.Schedule(ctx, &posthook.HookScheduleParams{
+    Path:   "/webhooks/reminder",
+    PostAt: time.Date(2026, 3, 14, 18, 0, 0, 0, time.UTC),
+    Data:   map[string]string{"user_id": "usr_123"},
+})
+```
+
+```bash curl
+curl -X POST https://api.posthook.io/v1/hooks \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "path": "/webhooks/reminder",
+    "postAt": "2026-03-14T18:00:00Z",
+    "data": { "user_id": "usr_123" }
+  }'
+```
+
+</CodeGroup>
+
+| Field | Description |
+| --- | --- |
+| `postAt` | RFC 3339 timestamp in UTC (e.g., `2026-03-14T18:00:00Z`). Timestamps in the past are delivered immediately. |
+
+## Local time scheduling with `postAtLocal` + `timezone`
+
+When you need delivery at a specific clock time in a specific timezone, use `postAtLocal` and `timezone` together. Posthook converts the local time to UTC at scheduling time, accounting for DST.
+
+<CodeGroup>
+
+```typescript TypeScript
+const hook = await posthook.hooks.schedule({
+  path: '/webhooks/reminder',
+  postAtLocal: '2026-03-15T09:00:00',
+  timezone: 'America/New_York',
+  data: { user_id: 'usr_123' }
+});
+```
+
+```python Python
+hook = client.hooks.schedule(
+    "/webhooks/reminder",
+    post_at_local="2026-03-15T09:00:00",
+    timezone="America/New_York",
+    data={"user_id": "usr_123"}
+)
+```
+
+```go Go
+hook, _, err := client.Hooks.Schedule(ctx, &posthook.HookScheduleParams{
+    Path:        "/webhooks/reminder",
+    PostAtLocal: "2026-03-15T09:00:00",
+    Timezone:    "America/New_York",
+    Data:        map[string]string{"user_id": "usr_123"},
+})
+```
+
+```bash curl
+curl -X POST https://api.posthook.io/v1/hooks \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "path": "/webhooks/reminder",
+    "postAtLocal": "2026-03-15T09:00:00",
+    "timezone": "America/New_York",
+    "data": { "user_id": "usr_123" }
+  }'
+```
+
+</CodeGroup>
+
+| Field | Description |
+| --- | --- |
+| `postAtLocal` | [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601) local datetime without offset, in `YYYY-MM-DDTHH:MM:SS` format (e.g., `2026-03-15T13:00:00`). Do not include a `Z` suffix or UTC offset. |
+| `timezone` | [IANA Time Zone](https://www.iana.org/time-zones) identifier (e.g., `America/New_York`, `Europe/London`, `Asia/Tokyo`). |
+
+## Relative delay with `postIn`
+
+Schedule a hook relative to now using a duration string. Posthook resolves the delay to a UTC timestamp at scheduling time.
+
+<CodeGroup>
+
+```typescript TypeScript
+const hook = await posthook.hooks.schedule({
+  path: '/webhooks/process',
+  postIn: '1h30m',
+  data: { job_id: 'job_789' }
+});
+```
+
+```python Python
+hook = client.hooks.schedule(
+    "/webhooks/process",
+    post_in="1h30m",
+    data={"job_id": "job_789"}
+)
+```
+
+```go Go
+hook, _, err := client.Hooks.Schedule(ctx, &posthook.HookScheduleParams{
+    Path:   "/webhooks/process",
+    PostIn: "1h30m",
+    Data:   map[string]string{"job_id": "job_789"},
+})
+```
+
+```bash curl
+curl -X POST https://api.posthook.io/v1/hooks \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "path": "/webhooks/process",
+    "postIn": "1h30m",
+    "data": { "job_id": "job_789" }
+  }'
+```
+
+</CodeGroup>
+
+| Field | Description |
+| --- | --- |
+| `postIn` | Duration string specifying how far in the future to deliver. Uses unit suffixes: `d` (days), `h` (hours), `m` (minutes), `s` (seconds). Compound values like `1d2h30m` are supported. Minimum 1 second, maximum 365 days. |
+
+**Examples**: `30s`, `5m`, `2h`, `7d`, `1h30m`, `1d2h30m45s`
+
+### Validation rules
+
+- Provide exactly one of `postAt`, `postAtLocal`, or `postIn`.
+- `timezone` is required with `postAtLocal` and forbidden with `postAt` or `postIn`.
+
+## DST behavior
+
+When using `postAtLocal` + `timezone`, Posthook resolves ambiguous times automatically:
+
+- **Spring forward (gap)**: If the local time falls in a skipped hour, delivery is shifted forward to the first valid moment after the gap (e.g., `02:30` becomes `03:00`).
+- **Fall back (fold)**: If the local time occurs twice, the earlier occurrence is used.
+
+## Per-hook retry override
+
+You can override your project's default retry settings for individual hooks by including a `retryOverride` object. If omitted, the hook uses your project's retry configuration.
+
+### Fields
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `minRetries` | integer | Yes | Number of retry attempts (1–15) |
+| `delaySecs` | integer | Yes | Base delay between retries in seconds (5–60) |
+| `strategy` | string | Yes | `fixed` (constant delay) or `exponential` (increasing delay). Available strategies may vary by plan. |
+| `backoffFactor` | number | No | Multiplier for exponential backoff (1.1–4.0). Defaults to `2.0` if omitted. |
+| `maxDelaySecs` | integer | No | Maximum delay cap in seconds (60–3600). Required when strategy is `exponential`. |
+| `jitter` | boolean | No | Add random jitter to retry delays to avoid thundering herd |
+
+### Example: aggressive retries
+
+Retry up to 15 times with a 5-second fixed delay:
+
+<CodeGroup>
+
+```typescript TypeScript
+const hook = await posthook.hooks.schedule({
+  path: '/webhooks/process-payment',
+  postAt: '2026-03-14T18:00:00Z',
+  data: { order_id: 'ord_789' },
+  retryOverride: {
+    minRetries: 15,
+    delaySecs: 5,
+    strategy: 'fixed'
+  }
+});
+```
+
+```python Python
+from posthook import HookRetryOverride
+
+hook = client.hooks.schedule(
+    "/webhooks/process-payment",
+    post_at="2026-03-14T18:00:00Z",
+    data={"order_id": "ord_789"},
+    retry_override=HookRetryOverride(
+        min_retries=15,
+        delay_secs=5,
+        strategy="fixed"
+    )
+)
+```
+
+```go Go
+hook, _, err := client.Hooks.Schedule(ctx, &posthook.HookScheduleParams{
+    Path:   "/webhooks/process-payment",
+    PostAt: time.Date(2026, 3, 14, 18, 0, 0, 0, time.UTC),
+    Data:   map[string]string{"order_id": "ord_789"},
+    RetryOverride: &posthook.HookRetryOverride{
+        MinRetries: 15,
+        DelaySecs:  5,
+        Strategy:   posthook.StrategyFixed,
+    },
+})
+```
+
+```bash curl
+curl -X POST https://api.posthook.io/v1/hooks \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "path": "/webhooks/process-payment",
+    "postAt": "2026-03-14T18:00:00Z",
+    "data": { "order_id": "ord_789" },
+    "retryOverride": {
+      "minRetries": 15,
+      "delaySecs": 5,
+      "strategy": "fixed"
+    }
+  }'
+```
+
+</CodeGroup>
+
+### Example: exponential backoff
+
+Start with a 10-second delay, doubling up to 5 minutes:
+
+<CodeGroup>
+
+```typescript TypeScript
+const hook = await posthook.hooks.schedule({
+  path: '/webhooks/sync-data',
+  postAtLocal: '2026-03-15T09:00:00',
+  timezone: 'America/Chicago',
+  data: { sync_id: 'sync_456' },
+  retryOverride: {
+    minRetries: 8,
+    delaySecs: 10,
+    strategy: 'exponential',
+    backoffFactor: 2.0,
+    maxDelaySecs: 300,
+    jitter: true
+  }
+});
+```
+
+```python Python
+from posthook import HookRetryOverride
+
+hook = client.hooks.schedule(
+    "/webhooks/sync-data",
+    post_at_local="2026-03-15T09:00:00",
+    timezone="America/Chicago",
+    data={"sync_id": "sync_456"},
+    retry_override=HookRetryOverride(
+        min_retries=8,
+        delay_secs=10,
+        strategy="exponential",
+        backoff_factor=2.0,
+        max_delay_secs=300,
+        jitter=True
+    )
+)
+```
+
+```go Go
+hook, _, err := client.Hooks.Schedule(ctx, &posthook.HookScheduleParams{
+    Path:        "/webhooks/sync-data",
+    PostAtLocal: "2026-03-15T09:00:00",
+    Timezone:    "America/Chicago",
+    Data:        map[string]string{"sync_id": "sync_456"},
+    RetryOverride: &posthook.HookRetryOverride{
+        MinRetries:   8,
+        DelaySecs:    10,
+        Strategy:     posthook.StrategyExponential,
+        BackoffFactor: 2.0,
+        MaxDelaySecs: 300,
+        Jitter:       true,
+    },
+})
+```
+
+```bash curl
+curl -X POST https://api.posthook.io/v1/hooks \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "path": "/webhooks/sync-data",
+    "postAtLocal": "2026-03-15T09:00:00",
+    "timezone": "America/Chicago",
+    "data": { "sync_id": "sync_456" },
+    "retryOverride": {
+      "minRetries": 8,
+      "delaySecs": 10,
+      "strategy": "exponential",
+      "backoffFactor": 2.0,
+      "maxDelaySecs": 300,
+      "jitter": true
+    }
+  }'
+```
+
+</CodeGroup>
+
+## Usage quota
+
+Each plan includes a monthly hook quota — the number of hooks you can schedule per calendar month. Every `POST /hooks` call counts toward the quota, regardless of when the hook is scheduled to deliver. The quota resets at the start of each calendar month.
+
+When you hit the limit, `POST /hooks` returns `429 Too Many Requests` until the quota resets. Posthook sends email alerts at 75%, 100%, and 150% of your quota so you can adjust usage or upgrade before reaching the limit. Quota limits may vary by plan.
+
+### Quota headers
+
+Every `POST /hooks` response includes headers showing your current plan usage:
+
+| Header | Description |
+| --- | --- |
+| `Posthook-HookQuota-Limit` | Maximum hooks allowed in the current calendar month |
+| `Posthook-HookQuota-Usage` | Hooks used so far in the current calendar month |
+| `Posthook-HookQuota-Remaining` | Hooks remaining in the current calendar month |
+| `Posthook-HookQuota-Resets-At` | RFC 3339 timestamp when the quota resets |
+
+Use these headers to monitor usage programmatically and avoid hitting plan limits.

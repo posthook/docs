@@ -25,8 +25,59 @@ X-API-Key: <YOUR_API_KEY>
 
 ```bash
 curl "https://api.posthook.io/v1/hooks" \
-  -H "X-API-Key: ph_test_..." \
+  -H "X-API-Key: phk_test_..." \
   -H "Content-Type: application/json"
 ```
+
+## Using the SDK
+
+The official SDKs handle authentication automatically. Pass your API key when creating the client — no need to set headers manually.
+
+<CodeGroup>
+
+```typescript TypeScript
+import Posthook from '@posthook/node';
+
+const posthook = new Posthook('phk_your_api_key');
+
+// All requests are automatically authenticated
+const hook = await posthook.hooks.schedule({
+  path: '/webhooks/remind',
+  postIn: '5m',
+  data: { userId: '123' }
+});
+```
+
+```python Python
+from posthook import Posthook
+
+client = Posthook("phk_your_api_key")
+
+# All requests are automatically authenticated
+hook = client.hooks.schedule(
+    "/webhooks/remind",
+    post_in="5m",
+    data={"userId": "123"}
+)
+```
+
+```go Go
+import "github.com/posthook/posthook-go"
+
+client, err := posthook.NewClient("phk_your_api_key")
+
+// All requests are automatically authenticated
+hook, _, err := client.Hooks.Schedule(ctx, &posthook.HookScheduleParams{
+    Path:   "/webhooks/remind",
+    PostIn: "5m",
+    Data:   map[string]string{"userId": "123"},
+})
+```
+
+</CodeGroup>
+
+<Tip>
+  You can also set the `POSTHOOK_API_KEY` environment variable instead of passing the key directly.
+</Tip>
 
 Your API keys carry significant privileges, so keep them secure. Do not share your secret API keys in publicly accessible areas such as GitHub, client-side code, etc.

@@ -17,32 +17,8 @@ The **API Key** is used to authenticate *your* requests to the Posthook API (e.g
 The **Signing Key** is used to verify that incoming hooks to your endpoint actually came from Posthook.
 
 - **Usage**: Used to compute the `Posthook-Signature` and `X-Ph-Signature` headers included with every delivery.
-- **Rotation**: Posthook supports zero-downtime key rotation. During the grace period, `Posthook-Signature` includes signatures for both the active and retiring keys. See [Key Rotation](/essentials/hook-delivery#key-rotation).
+- **Rotation**: Posthook supports zero-downtime key rotation. During the grace period, `Posthook-Signature` includes signatures for both the active and retiring keys. See [Key Rotation](#key-rotation).
 - **Exposure**: This key should also be kept secret on your backend.
-
-## Idempotency
-
-Posthook automatically retries failed deliveries. If your server hangs or returns an error, the same hook is sent again.
-
-To prevent processing the same hook twice (e.g., sending a user two emails), your hook handler should be **idempotent**.
-
-### Best Practice
-Include a unique ID in your payload (e.g., `idempotency_key`, `event_id`, or your own business logic ID like `reminder_id`).
-
-```json
-{
-  "path": "/webhooks/remind",
-  "data": {
-    "reminder_id": "rem_559201",
-    "user_id": "usr_201"
-  }
-}
-```
-
-When your handler receives the request:
-1. Check if `reminder_id` "rem_559201" has already been processed.
-2. If yes, return `200 OK` immediately without doing work.
-3. If no, process the work and mark the ID as processed.
 
 ## Replay Attacks
 
@@ -50,7 +26,7 @@ To protect against replay attacks, where an attacker intercepts and resends a va
 
 You can use either:
 - **`Posthook-Timestamp` header** (recommended) — Unix timestamp in seconds. This value is also part of the signed payload, so it cannot be tampered with.
-- **`postedAt` body field** — ISO 8601 timestamp.
+- **`postedAt` body field** — RFC 3339 timestamp.
 
 ### Best Practice
 Reject requests where the timestamp is too far from the current time (e.g., 5 minutes).
@@ -65,6 +41,112 @@ if (Math.abs(now - timestamp) > TOLERANCE) {
 }
 ```
 
-## Verifying Signatures
+## SDK Verification (Recommended)
 
-We strongly recommend verifying the `Posthook-Signature` header on every request. See the [Hook Delivery](/essentials/hook-delivery#verifying-signatures) page for the algorithm details and code examples in Node.js, Python, and Go.
+The official SDKs provide a `parseDelivery()` method that handles signature verification, timestamp validation, and replay protection in a single call. You will need your **Signing Key**, found in **Project Settings** in the [Dashboard](https://posthook.io/app/home).
+
+<CodeGroup>
+
+```javascript Node.js
+import { Signatures, SignatureVerificationError } from '@posthook/node';
+
+const signatures = new Signatures(process.env.POSTHOOK_SIGNING_KEY);
+
+app.post('/webhooks/posthook/remind', async (req, res) => {
+  try {
+    const delivery = signatures.parseDelivery(req.body, req.headers);
+    // delivery.data is your verified payload
+    await sendReminder(delivery.data.userId);
+    res.status(200).send('OK');
+  } catch (err) {
+    if (err instanceof SignatureVerificationError) {
+      return res.status(401).json({ error: err.message, code: err.code });
+    }
+    throw err;
+  }
+});
+```
+
+```python Python
+from posthook import SignaturesService, SignatureVerificationError
+
+signatures = SignaturesService(os.environ["POSTHOOK_SIGNING_KEY"])
+
+@app.route('/webhooks/posthook/remind', methods=['POST'])
+def handle_remind():
+    try:
+        delivery = signatures.parse_delivery(
+            request.get_data(),
+            dict(request.headers)
+        )
+        # delivery.data is your verified payload
+        send_reminder(delivery.data["userId"])
+        return "OK", 200
+    except SignatureVerificationError as err:
+        return {"error": err.message, "code": err.code}, 401
+```
+
+```go Go
+import posthook "github.com/posthook/posthook-go"
+
+signatures, _ := posthook.NewSignatures(os.Getenv("POSTHOOK_SIGNING_KEY"))
+
+func handleRemind(w http.ResponseWriter, r *http.Request) {
+    body, _ := io.ReadAll(r.Body)
+    delivery, err := signatures.ParseDelivery(body, r.Header)
+    if err != nil {
+        http.Error(w, "Invalid signature", http.StatusUnauthorized)
+        return
+    }
+    // delivery.Data is your verified payload
+    w.WriteHeader(http.StatusOK)
+}
+```
+
+</CodeGroup>
+
+<Tip>
+  `parseDelivery()` automatically rejects requests older than 5 minutes (configurable via `tolerance` option). No need to implement replay protection manually.
+</Tip>
+
+## How It Works
+
+Under the hood, the SDK verifies the `Posthook-Signature` header using HMAC-SHA256. Every webhook delivery includes three headers:
+
+| Header | Example |
+| --- | --- |
+| `Posthook-Id` | `e5405623-2c1c-460e-9737-c884f7f59035` |
+| `Posthook-Timestamp` | `1700000000` |
+| `Posthook-Signature` | `v1,abc123 v1,def456` |
+
+The signature algorithm:
+
+1. Build the signed payload: `{Posthook-Timestamp}.{raw_body}` (dot-separated).
+2. Compute HMAC-SHA256 using your project's signing key.
+3. Hex-encode the result (lowercase, 64 characters).
+4. Prefix with `v1,`.
+
+During [key rotation](#key-rotation), `Posthook-Signature` contains **two** space-separated signatures (one per key). The SDK accepts the delivery if **either** signature matches.
+
+## Key Rotation
+
+Posthook supports zero-downtime key rotation through a grace period:
+
+1. **Before rotation** — `Posthook-Signature` has one `v1,` entry using the active signing key.
+2. **After rotation (grace period)** — `Posthook-Signature` includes **two** `v1,` entries: one for the new active key and one for the retiring key. Accept the delivery if either matches.
+3. **After grace period expires** — The retiring key is excluded. `Posthook-Signature` returns to a single `v1,` entry.
+4. **Revoke (optional)** — You can revoke the retiring key early via the API or dashboard.
+
+<Warning>
+  The legacy `X-Ph-Signature` header switches to the new key **immediately** on rotation with no grace period. This is the primary reason to migrate to `Posthook-Signature`.
+</Warning>
+
+## Legacy Header (X-Ph-Signature)
+
+<Note>
+  `X-Ph-Signature` is deprecated. Migrate to `Posthook-Signature` for dual-key support during key rotation. The SDK's `parseDelivery()` verifies `Posthook-Signature` automatically.
+</Note>
+
+`X-Ph-Signature` contains a hex-encoded HMAC-SHA256 of the **raw request body** using the active project signing key.
+
+**Key difference:** `X-Ph-Signature` uses only the active key. When you rotate your signing key, this header immediately switches to the new key — there is no grace period. If your consumer hasn't updated yet, verification will fail until it starts using the new key.

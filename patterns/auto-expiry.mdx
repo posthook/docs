@@ -10,16 +10,24 @@ Temporary resources like shareable links, export files, or beta accounts need li
 1.  **Schedule**: When you create a resource, schedule its deletion for `X` hours later.
 2.  **Handle**: Delete the resource.
 
-```javascript
+<CodeGroup>
+
+```typescript TypeScript
+import Posthook from '@posthook/node';
+import { Signatures, SignatureVerificationError } from '@posthook/node';
+
+const posthook = new Posthook(process.env.POSTHOOK_API_KEY);
+const signatures = new Signatures(process.env.POSTHOOK_SIGNING_KEY);
+
 /* 1. Schedule */
 async function createShareableLink(fileId) {
   // 1. Create the temporary link
   const linkToken = await db.createLink({ fileId });
 
   // 2. Schedule expiration for 24 hours
-  posthook.schedule({
+  await posthook.hooks.schedule({
     path: '/webhooks/expire-link',
-    postAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    postIn: '24h',
     data: {
       token: linkToken
     }
@@ -30,20 +38,132 @@ async function createShareableLink(fileId) {
 
 /* 2. Handle */
 app.post('/webhooks/expire-link', async (req, res) => {
-  // Verify signature (see Hook Delivery)
-  if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
+  try {
+    const delivery = signatures.parseDelivery(req.body, req.headers);
 
-  const { token } = req.body.data;
+    const { token } = delivery.data;
 
-  // Check if it was already manually deleted?
-  const link = await db.getLink(token);
-  if (!link) {
-    return res.status(200).send('Already deleted');
+    // Check if it was already manually deleted?
+    const link = await db.getLink(token);
+    if (!link) {
+      return res.status(200).send('Already deleted');
+    }
+
+    // Perform the cleanup
+    await db.deleteLink(token);
+
+    res.status(200).send('Resource expired');
+  } catch (err) {
+    if (err instanceof SignatureVerificationError) {
+      return res.status(401).json({ error: err.message });
+    }
+    throw err;
   }
-
-  // Perform the cleanup
-  await db.deleteLink(token);
-  
-  res.status(200).send('Resource expired');
 });
 ```
+
+```python Python
+from posthook import Posthook, SignaturesService, SignatureVerificationError
+from flask import Flask, request, jsonify
+import os
+
+client = Posthook(os.environ["POSTHOOK_API_KEY"])
+app = Flask(__name__)
+signatures = SignaturesService(os.environ["POSTHOOK_SIGNING_KEY"])
+
+# 1. Schedule
+def create_shareable_link(file_id):
+    # 1. Create the temporary link
+    link_token = db.create_link(file_id=file_id)
+
+    # 2. Schedule expiration for 24 hours
+    client.hooks.schedule(
+        "/webhooks/expire-link",
+        post_in="24h",
+        data={"token": link_token}
+    )
+
+    return link_token
+
+# 2. Handle
+@app.route("/webhooks/expire-link", methods=["POST"])
+def handle_expire_link():
+    try:
+        delivery = signatures.parse_delivery(
+            request.get_data(), dict(request.headers)
+        )
+
+        token = delivery.data["token"]
+
+        # Check if it was already manually deleted?
+        link = db.get_link(token)
+        if not link:
+            return "Already deleted", 200
+
+        # Perform the cleanup
+        db.delete_link(token)
+
+        return "Resource expired", 200
+    except SignatureVerificationError as err:
+        return jsonify(error=err.message), 401
+```
+
+```go Go
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+
+	posthook "github.com/posthook/posthook-go"
+)
+
+var client, _ = posthook.NewClient(os.Getenv("POSTHOOK_API_KEY"))
+var signatures, _ = posthook.NewSignatures(os.Getenv("POSTHOOK_SIGNING_KEY"))
+
+// 1. Schedule
+func createShareableLink(fileID string) string {
+	linkToken := db.CreateLink(fileID)
+
+	client.Hooks.Schedule(context.Background(), &posthook.HookScheduleParams{
+		Path:   "/webhooks/expire-link",
+		PostIn: "24h",
+		Data:   map[string]string{"token": linkToken},
+	})
+
+	return linkToken
+}
+
+// 2. Handle
+func handleExpireLink(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+
+	delivery, err := signatures.ParseDelivery(body, r.Header)
+	if err != nil {
+		http.Error(w, "Invalid signature", http.StatusUnauthorized)
+		return
+	}
+
+	var data struct {
+		Token string `json:"token"`
+	}
+	json.Unmarshal(delivery.Data, &data)
+
+	// Check if it was already manually deleted?
+	link, _ := db.GetLink(data.Token)
+	if link == nil {
+		fmt.Fprint(w, "Already deleted")
+		return
+	}
+
+	// Perform the cleanup
+	db.DeleteLink(data.Token)
+	fmt.Fprint(w, "Resource expired")
+}
+```
+
+</CodeGroup>

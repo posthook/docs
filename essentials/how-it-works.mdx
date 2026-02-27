@@ -1,0 +1,58 @@
+---
+title: 'How Posthook Works'
+description: 'Understand the hook lifecycle from scheduling to delivery'
+---
+
+## Hook Lifecycle
+
+<Steps>
+  <Step title="Schedule">
+    You call `POST /hooks` with a path, payload, and a time. The hook is immediately committed to a **durable message queue** before the API returns `201`. This guarantees your hook is safely accepted even during traffic spikes or database maintenance.
+  </Step>
+  <Step title="Persist">
+    The hook is pulled off the queue and written to a high-availability **PostgreSQL** cluster for long-term tracking and dashboard visibility.
+  </Step>
+  <Step title="Wait">
+    The hook remains dormant until its scheduled delivery time.
+  </Step>
+  <Step title="Dispatch">
+    Due hooks are atomically claimed and published to a durable outgoing queue.
+  </Step>
+  <Step title="Deliver">
+    The hook is picked up from the outgoing queue. Before making the HTTP request, a **distributed lock** is acquired to minimize duplicate deliveries. The request includes your payload, hook metadata, and [cryptographic signatures](/essentials/security).
+  </Step>
+  <Step title="Resolve">
+    - **2xx** → `completed`. Delivery is done.
+    - **Non-2xx or timeout** → `retry`. Retries follow your [retry configuration](/essentials/scheduling#per-hook-retry-override). After exhausting all attempts → `failed` and a [notification](/essentials/project-settings#notifications) is sent.
+  </Step>
+</Steps>
+
+## Hook Statuses
+
+The API exposes four statuses. Internal states (like dispatching or in-flight) are abstracted into `pending`.
+
+| Status | Meaning |
+|--------|---------|
+| `pending` | Scheduled and waiting for delivery time, or currently in-flight. |
+| `retry` | Delivery failed. Waiting for the next retry attempt. |
+| `completed` | Delivered successfully (2xx response). Terminal. |
+| `failed` | All retries exhausted. Terminal. |
+
+```
+pending → completed              (first attempt succeeds)
+pending → retry → completed      (succeeds after retries)
+pending → retry → failed         (all retries exhausted)
+```
+
+## Multi-Zone Redundancy
+
+All infrastructure runs across **multiple availability zones** within a region:
+
+- **Compute** — Kubernetes cluster with automatic rescheduling on zone failure.
+- **Messaging** — Google Cloud Pub/Sub, a global service with no single zone dependency.
+- **Storage** — PostgreSQL with synchronous replication and automatic failover.
+- **Caching and Locking** — Valkey with replicas across zones for deduplication availability.
+
+## What Gets Sent
+
+When Posthook delivers a hook, it sends an HTTP POST with your payload, hook metadata, and signature headers. See [Receiving Webhooks](/essentials/receiving-webhooks) for the full request format and framework-specific handler examples.

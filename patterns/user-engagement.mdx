@@ -7,20 +7,30 @@ Posthook powers user engagement workflows that require timing delays, such as re
 
 ## Event Reminders
 
-Send a reminder 1 hour before a scheduled event starts.
+Send a reminder the evening before a scheduled event, at 5 PM in the user's local timezone.
 
-1.  **Schedule**: When the user books, schedule the reminder.
+1.  **Schedule**: When the user books, schedule the reminder for the day before at 5 PM local.
 2.  **Handle**: When the hook fires, send the email.
 
-```javascript
-/* 1. Schedule */
-function onWebinarBooking(booking) {
-  const eventTime = new Date(booking.date);
-  const reminderTime = new Date(eventTime.getTime() - 60 * 60 * 1000); // 1 hour before
+<CodeGroup>
 
-  posthook.schedule({
+```typescript TypeScript
+import Posthook from '@posthook/node';
+import { Signatures, SignatureVerificationError } from '@posthook/node';
+
+const posthook = new Posthook(process.env.POSTHOOK_API_KEY);
+const signatures = new Signatures(process.env.POSTHOOK_SIGNING_KEY);
+
+/* 1. Schedule */
+async function onWebinarBooking(booking) {
+  const reminder = new Date(booking.date);
+  reminder.setUTCDate(reminder.getUTCDate() - 1);
+  reminder.setUTCHours(17, 0, 0, 0);
+
+  await posthook.hooks.schedule({
     path: '/webhooks/send-email',
-    postAt: reminderTime.toISOString(),
+    postAtLocal: reminder.toISOString().split('.')[0],
+    timezone: booking.timezone,
     // LEAST PRIVILEGE: Only send the ID. Don't send PII or template logic.
     data: {
       bookingId: booking.id,
@@ -30,30 +40,168 @@ function onWebinarBooking(booking) {
 
 /* 2. Handle */
 app.post('/webhooks/send-email', async (req, res) => {
-  // Verify signature (see Hook Delivery)
-  if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
+  try {
+    const delivery = signatures.parseDelivery(req.body, req.headers);
 
-  const { bookingId } = req.body.data;
-  const booking = await db.getBooking(bookingId);
+    const { bookingId } = delivery.data;
+    const booking = await db.getBooking(bookingId);
 
-  // VALIDITY CHECKS:
-  if (!booking || booking.status === 'cancelled') {
-    return res.status(200).send('Booking cancelled or not found');
+    // VALIDITY CHECKS:
+    if (!booking || booking.status === 'cancelled') {
+      return res.status(200).send('Booking cancelled or not found');
+    }
+
+    if (booking.reminderSent) {
+      return res.status(200).send('Reminder already sent');
+    }
+
+    // Derive logic from your DB, not the payload
+    const template = booking.type === 'webinar' ? 'webinar_reminder' : 'event_reminder';
+
+    await emailService.send(booking.userId, template, { event: booking.event });
+    await db.markReminderSent(bookingId);
+
+    res.status(200).send('Reminder sent');
+  } catch (err) {
+    if (err instanceof SignatureVerificationError) {
+      return res.status(401).json({ error: err.message });
+    }
+    throw err;
   }
-  
-  if (booking.reminderSent) {
-    return res.status(200).send('Reminder already sent');
-  }
-
-  // Derive logic from your DB, not the payload
-  const template = booking.type === 'webinar' ? 'webinar_reminder' : 'event_reminder';
-
-  await emailService.send(booking.userId, template, { event: booking.event });
-  await db.markReminderSent(bookingId);
-  
-  res.status(200).send('Reminder sent');
 });
 ```
+
+```python Python
+from posthook import Posthook, SignaturesService, SignatureVerificationError
+from flask import Flask, request, jsonify
+from datetime import datetime, timedelta
+import os
+
+client = Posthook(os.environ["POSTHOOK_API_KEY"])
+app = Flask(__name__)
+signatures = SignaturesService(os.environ["POSTHOOK_SIGNING_KEY"])
+
+# 1. Schedule
+def on_webinar_booking(booking):
+    event_date = datetime.fromisoformat(booking["date"])
+    reminder = event_date.replace(hour=17, minute=0, second=0) - timedelta(days=1)
+
+    client.hooks.schedule(
+        "/webhooks/send-email",
+        post_at_local=reminder.strftime("%Y-%m-%dT%H:%M:%S"),
+        timezone=booking["timezone"],
+        # LEAST PRIVILEGE: Only send the ID. Don't send PII or template logic.
+        data={"booking_id": booking["id"]}
+    )
+
+# 2. Handle
+@app.route("/webhooks/send-email", methods=["POST"])
+def handle_send_email():
+    try:
+        delivery = signatures.parse_delivery(
+            request.get_data(), dict(request.headers)
+        )
+
+        booking_id = delivery.data["booking_id"]
+        booking = db.get_booking(booking_id)
+
+        # VALIDITY CHECKS:
+        if not booking or booking["status"] == "cancelled":
+            return "Booking cancelled or not found", 200
+
+        if booking["reminder_sent"]:
+            return "Reminder already sent", 200
+
+        # Derive logic from your DB, not the payload
+        template = "webinar_reminder" if booking["type"] == "webinar" else "event_reminder"
+
+        email_service.send(booking["user_id"], template, {"event": booking["event"]})
+        db.mark_reminder_sent(booking_id)
+
+        return "Reminder sent", 200
+    except SignatureVerificationError as err:
+        return jsonify(error=err.message), 401
+```
+
+```go Go
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"time"
+
+	posthook "github.com/posthook/posthook-go"
+)
+
+var client, _ = posthook.NewClient(os.Getenv("POSTHOOK_API_KEY"))
+var signatures, _ = posthook.NewSignatures(os.Getenv("POSTHOOK_SIGNING_KEY"))
+
+// 1. Schedule
+func onWebinarBooking(booking Booking) {
+	eventTime, _ := time.Parse(time.RFC3339, booking.Date)
+	d := eventTime.AddDate(0, 0, -1)
+	reminder := time.Date(d.Year(), d.Month(), d.Day(), 17, 0, 0, 0, time.UTC)
+
+	client.Hooks.Schedule(context.Background(), &posthook.HookScheduleParams{
+		Path:        "/webhooks/send-email",
+		PostAtLocal: reminder.Format("2006-01-02T15:04:05"),
+		Timezone:    booking.Timezone,
+		// LEAST PRIVILEGE: Only send the ID. Don't send PII or template logic.
+		Data: map[string]string{"bookingId": booking.ID},
+	})
+}
+
+// 2. Handle
+func handleSendEmail(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+
+	delivery, err := signatures.ParseDelivery(body, r.Header)
+	if err != nil {
+		http.Error(w, "Invalid signature", http.StatusUnauthorized)
+		return
+	}
+
+	var data struct {
+		BookingID string `json:"bookingId"`
+	}
+	json.Unmarshal(delivery.Data, &data)
+
+	booking, err := db.GetBooking(data.BookingID)
+
+	// VALIDITY CHECKS:
+	if err != nil || booking == nil || booking.Status == "cancelled" {
+		fmt.Fprint(w, "Booking cancelled or not found")
+		return
+	}
+
+	if booking.ReminderSent {
+		fmt.Fprint(w, "Reminder already sent")
+		return
+	}
+
+	// Derive logic from your DB, not the payload
+	template := "event_reminder"
+	if booking.Type == "webinar" {
+		template = "webinar_reminder"
+	}
+
+	emailService.Send(booking.UserID, template, map[string]string{"event": booking.Event})
+	db.MarkReminderSent(data.BookingID)
+
+	fmt.Fprint(w, "Reminder sent")
+}
+```
+
+</CodeGroup>
+
+<Note>
+  The `reminderSent` check prevents most duplicates, but there's a small race window if a retry arrives before the flag is committed. If you need stricter guarantees, see [Idempotency](/essentials/receiving-webhooks#idempotency).
+</Note>
 
 ## Abandoned Cart Recovery
 
@@ -64,12 +212,20 @@ Instead of trying to cancel the hook when a user purchases, it's often simpler t
 1.  **Schedule**: When the user adds an item, schedule the email for 30 minutes later.
 2.  **Verify**: When the webhook handler receives the request, check if the cart has been converted to an order.
 
-```javascript
+<CodeGroup>
+
+```typescript TypeScript
+import Posthook from '@posthook/node';
+import { Signatures, SignatureVerificationError } from '@posthook/node';
+
+const posthook = new Posthook(process.env.POSTHOOK_API_KEY);
+const signatures = new Signatures(process.env.POSTHOOK_SIGNING_KEY);
+
 /* 1. Schedule the Nudge */
-function onAddToCart(cart) {
-  posthook.schedule({
+async function onAddToCart(cart) {
+  await posthook.hooks.schedule({
     path: '/webhooks/cart/abandoned',
-    postAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    postIn: '30m',
     data: {
       cartId: cart.id
     }
@@ -78,20 +234,124 @@ function onAddToCart(cart) {
 
 /* 2. Handle & Verify */
 app.post('/webhooks/cart/abandoned', async (req, res) => {
-  // Verify signature (see Hook Delivery)
-  if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
+  try {
+    const delivery = signatures.parseDelivery(req.body, req.headers);
 
-  const { cartId } = req.body.data;
-  const cart = await db.getCarts(cartId);
+    const { cartId } = delivery.data;
+    const cart = await db.getCarts(cartId);
 
-  // IDEMPOTENCY CHECK:
-  // If the cart is already "completed" or "paid", do nothing.
-  if (cart.status === 'completed') {
-    return res.status(200).send('Cart already recovered');
+    // IDEMPOTENCY CHECK:
+    // If the cart is already "completed" or "paid", do nothing.
+    if (cart.status === 'completed') {
+      return res.status(200).send('Cart already recovered');
+    }
+
+    // Otherwise, send the email
+    await sendRecoveryEmail(cart.userId);
+    res.status(200).send('Email sent');
+  } catch (err) {
+    if (err instanceof SignatureVerificationError) {
+      return res.status(401).json({ error: err.message });
+    }
+    throw err;
   }
-
-  // Otherwise, send the email
-  await sendRecoveryEmail(cart.userId);
-  res.status(200).send('Email sent');
 });
 ```
+
+```python Python
+from posthook import Posthook, SignaturesService, SignatureVerificationError
+from flask import Flask, request, jsonify
+import os
+
+client = Posthook(os.environ["POSTHOOK_API_KEY"])
+app = Flask(__name__)
+signatures = SignaturesService(os.environ["POSTHOOK_SIGNING_KEY"])
+
+# 1. Schedule the Nudge
+def on_add_to_cart(cart):
+    client.hooks.schedule(
+        "/webhooks/cart/abandoned",
+        post_in="30m",
+        data={"cart_id": cart["id"]}
+    )
+
+# 2. Handle & Verify
+@app.route("/webhooks/cart/abandoned", methods=["POST"])
+def handle_abandoned_cart():
+    try:
+        delivery = signatures.parse_delivery(
+            request.get_data(), dict(request.headers)
+        )
+
+        cart_id = delivery.data["cart_id"]
+        cart = db.get_cart(cart_id)
+
+        # IDEMPOTENCY CHECK:
+        # If the cart is already "completed" or "paid", do nothing.
+        if cart["status"] == "completed":
+            return "Cart already recovered", 200
+
+        # Otherwise, send the email
+        send_recovery_email(cart["user_id"])
+        return "Email sent", 200
+    except SignatureVerificationError as err:
+        return jsonify(error=err.message), 401
+```
+
+```go Go
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+
+	posthook "github.com/posthook/posthook-go"
+)
+
+var client, _ = posthook.NewClient(os.Getenv("POSTHOOK_API_KEY"))
+var signatures, _ = posthook.NewSignatures(os.Getenv("POSTHOOK_SIGNING_KEY"))
+
+// 1. Schedule the Nudge
+func onAddToCart(cart Cart) {
+	client.Hooks.Schedule(context.Background(), &posthook.HookScheduleParams{
+		Path:   "/webhooks/cart/abandoned",
+		PostIn: "30m",
+		Data:   map[string]string{"cartId": cart.ID},
+	})
+}
+
+// 2. Handle & Verify
+func handleAbandonedCart(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+
+	delivery, err := signatures.ParseDelivery(body, r.Header)
+	if err != nil {
+		http.Error(w, "Invalid signature", http.StatusUnauthorized)
+		return
+	}
+
+	var data struct {
+		CartID string `json:"cartId"`
+	}
+	json.Unmarshal(delivery.Data, &data)
+
+	cart, _ := db.GetCart(data.CartID)
+
+	// IDEMPOTENCY CHECK:
+	// If the cart is already "completed" or "paid", do nothing.
+	if cart.Status == "completed" {
+		fmt.Fprint(w, "Cart already recovered")
+		return
+	}
+
+	// Otherwise, send the email
+	sendRecoveryEmail(cart.UserID)
+	fmt.Fprint(w, "Email sent")
+}
+```
+
+</CodeGroup>

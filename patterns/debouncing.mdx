@@ -17,14 +17,22 @@ Instead of cancelling previous hooks (which requires tracking IDs), you can use 
 
 Sync a user profile to Salesforce 5 minutes after their last edit.
 
-```javascript
+<CodeGroup>
+
+```typescript TypeScript
+import Posthook from '@posthook/node';
+import { Signatures, SignatureVerificationError } from '@posthook/node';
+
+const posthook = new Posthook(process.env.POSTHOOK_API_KEY);
+const signatures = new Signatures(process.env.POSTHOOK_SIGNING_KEY);
+
 /* 1. Schedule */
-function onUserProfileUpdate(user) {
+async function onUserProfileUpdate(user) {
   // Always schedule the sync for 5 minutes later
   // Pass the creation time of THIS specific event
-  posthook.schedule({
+  await posthook.hooks.schedule({
     path: '/webhooks/sync/salesforce',
-    postAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    postIn: '5m',
     data: {
       userId: user.id,
       triggeredAt: new Date().toISOString()
@@ -34,23 +42,142 @@ function onUserProfileUpdate(user) {
 
 /* 2. Handle */
 app.post('/webhooks/sync/salesforce', async (req, res) => {
-  // Verify signature (see Hook Delivery)
-  if (!verifyPosthookSignature(req)) return res.status(401).send('Invalid signature');
+  try {
+    const delivery = signatures.parseDelivery(req.body, req.headers);
 
-  const { userId, triggeredAt } = req.body.data;
-  const user = await db.getUser(userId);
+    const { userId, triggeredAt } = delivery.data;
+    const user = await db.getUser(userId);
 
-  // STALE CHECK:
-  // If the user record has been updated SINCE this hook was scheduled,
-  // then a newer hook exists in the queue. We can safely skip this one.
-  if (new Date(user.updatedAt) > new Date(triggeredAt)) {
-    return res.status(200).send('Stale request, skipping');
+    // STALE CHECK:
+    // If the user record has been updated SINCE this hook was scheduled,
+    // then a newer hook exists in the queue. We can safely skip this one.
+    if (new Date(user.updatedAt) > new Date(triggeredAt)) {
+      return res.status(200).send('Stale request, skipping');
+    }
+
+    // If timestamps match (or are very close), this is the latest action.
+    await salesforce.sync(user);
+    res.status(200).send('Synced');
+  } catch (err) {
+    if (err instanceof SignatureVerificationError) {
+      return res.status(401).json({ error: err.message });
+    }
+    throw err;
   }
-
-  // If timestamps match (or are very close), this is the latest action.
-  await salesforce.sync(user);
-  res.status(200).send('Synced');
 });
 ```
+
+```python Python
+from posthook import Posthook, SignaturesService, SignatureVerificationError
+from flask import Flask, request, jsonify
+from datetime import datetime
+import os
+
+client = Posthook(os.environ["POSTHOOK_API_KEY"])
+app = Flask(__name__)
+signatures = SignaturesService(os.environ["POSTHOOK_SIGNING_KEY"])
+
+# 1. Schedule
+def on_user_profile_update(user):
+    # Always schedule the sync for 5 minutes later
+    # Pass the creation time of THIS specific event
+    client.hooks.schedule(
+        "/webhooks/sync/salesforce",
+        post_in="5m",
+        data={
+            "user_id": user["id"],
+            "triggered_at": datetime.now().isoformat()
+        }
+    )
+
+# 2. Handle
+@app.route("/webhooks/sync/salesforce", methods=["POST"])
+def handle_sync_salesforce():
+    try:
+        delivery = signatures.parse_delivery(
+            request.get_data(), dict(request.headers)
+        )
+
+        user_id = delivery.data["user_id"]
+        triggered_at = delivery.data["triggered_at"]
+        user = db.get_user(user_id)
+
+        # STALE CHECK:
+        # If the user record has been updated SINCE this hook was scheduled,
+        # then a newer hook exists in the queue. We can safely skip this one.
+        if datetime.fromisoformat(user["updated_at"]) > datetime.fromisoformat(triggered_at):
+            return "Stale request, skipping", 200
+
+        # If timestamps match (or are very close), this is the latest action.
+        salesforce.sync(user)
+        return "Synced", 200
+    except SignatureVerificationError as err:
+        return jsonify(error=err.message), 401
+```
+
+```go Go
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"time"
+
+	posthook "github.com/posthook/posthook-go"
+)
+
+var client, _ = posthook.NewClient(os.Getenv("POSTHOOK_API_KEY"))
+var signatures, _ = posthook.NewSignatures(os.Getenv("POSTHOOK_SIGNING_KEY"))
+
+// 1. Schedule
+func onUserProfileUpdate(user User) {
+	client.Hooks.Schedule(context.Background(), &posthook.HookScheduleParams{
+		Path:   "/webhooks/sync/salesforce",
+		PostIn: "5m",
+		Data: map[string]string{
+			"userId":      user.ID,
+			"triggeredAt": time.Now().Format(time.RFC3339),
+		},
+	})
+}
+
+// 2. Handle
+func handleSyncSalesforce(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+
+	delivery, err := signatures.ParseDelivery(body, r.Header)
+	if err != nil {
+		http.Error(w, "Invalid signature", http.StatusUnauthorized)
+		return
+	}
+
+	var data struct {
+		UserID      string `json:"userId"`
+		TriggeredAt string `json:"triggeredAt"`
+	}
+	json.Unmarshal(delivery.Data, &data)
+
+	user, _ := db.GetUser(data.UserID)
+
+	// STALE CHECK:
+	// If the user record has been updated SINCE this hook was scheduled,
+	// then a newer hook exists in the queue. We can safely skip this one.
+	triggeredAt, _ := time.Parse(time.RFC3339, data.TriggeredAt)
+	if user.UpdatedAt.After(triggeredAt) {
+		fmt.Fprint(w, "Stale request, skipping")
+		return
+	}
+
+	// If timestamps match (or are very close), this is the latest action.
+	salesforce.Sync(user)
+	fmt.Fprint(w, "Synced")
+}
+```
+
+</CodeGroup>
 
 This ensures that if a user updates their profile 10 times in one minute, only the **last** hook will actually trigger the sync. The previous 9 will detect they are "stale" and exit immediately.

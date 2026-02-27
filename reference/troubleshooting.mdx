@@ -1,0 +1,40 @@
+---
+title: 'Troubleshooting'
+description: 'Common issues and how to fix them'
+---
+
+## My hook didn't fire
+
+- **Check hook status in the Dashboard** — Is it still `pending`? If so, the scheduled time hasn't arrived yet.
+- **Verify `postAt` is in the past** — Hooks only fire once their scheduled time is reached. Use `postIn: "5s"` for quick tests.
+- **Check if your plan quota is exhausted** — Look at the `Posthook-HookQuota-Remaining` header in your `POST /hooks` responses. See [Usage quota headers](/essentials/scheduling#quota-headers).
+- **Confirm the project domain is set** — Hooks are delivered to `https://{domain}{path}`. If your domain isn't configured, there's nowhere to deliver. Check [Project Settings](/essentials/project-settings).
+
+## My hook keeps retrying
+
+- **Your endpoint is returning non-2xx** — Check your server logs. Posthook treats any non-2xx response as a failure.
+- **Your endpoint is timing out** — Posthook enforces a 10-second delivery timeout. If your handler takes longer, offload to a background queue and return `200 OK` immediately. See [Handling Long-Running Tasks](/essentials/receiving-webhooks#handling-long-running-tasks).
+- **Check retry config** — Review your project's retry settings in [Project Settings](/essentials/project-settings). Individual hooks may also have [per-hook retry overrides](/essentials/scheduling#per-hook-retry-override).
+
+## Signature verification is failing
+
+- **Verify you're using the correct key** — Use the **Signing Key**, not the API key. Find it in Project Settings in the [Dashboard](https://posthook.io/app/home).
+- **Check for body parsing middleware** — Middleware that parses or modifies the raw request body before verification will break the signature. Verify against the raw body bytes.
+- **If you recently rotated keys** — During the grace period, `Posthook-Signature` includes signatures for both keys. Make sure your code checks both. See [Key Rotation](/essentials/security#key-rotation).
+- **Clock skew** — `parseDelivery()` rejects requests older than 5 minutes by default. Ensure your server's clock is synchronized (NTP).
+
+## Getting 429 Too Many Requests
+
+- **You've exceeded your monthly hook quota** — Check `Posthook-HookQuota-Remaining` headers to confirm. See [Usage quota headers](/essentials/scheduling#quota-headers). Upgrade your plan or wait for the quota to reset.
+
+## Hooks are delivered to the wrong URL
+
+- **Check your project domain** — The delivery URL is `https://{domain}{path}`. Verify the domain in [Project Settings](/essentials/project-settings).
+- **HTTPS is enforced** — All deliveries use HTTPS. Make sure your endpoint supports it.
+- **Check for trailing slashes or typos** — The path in the hook request is used exactly as-is. Double-check for extra slashes or typos.
+
+## CLI can't connect
+
+- **Check your API key** — Run `npx posthook login` to re-enter your key. You can find it in Project Settings.
+- **Firewall or proxy** — The CLI connects via WebSocket. Make sure outbound WebSocket connections aren't blocked by your network.
+- **Try a fresh session** — Run `npx posthook logout` then `npx posthook login` to reset your stored credentials.

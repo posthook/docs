@@ -3,7 +3,7 @@ title: 'Project Settings'
 description: 'Configure retries, notifications, and delivery settings'
 ---
 
-You can configure your project's behavior in the **Settings** tab of the dashboard.
+You can configure your project's behavior in the **Settings** tab of the dashboard, or declaratively via [`posthook.toml`](/essentials/config-as-code).
 
 ## General
 
@@ -15,20 +15,88 @@ You can configure your project's behavior in the **Settings** tab of the dashboa
 
 Control how Posthook handles failures (non-200 responses or timeouts).
 
-- **Max Retries**: Choose between 1 and 10 attempts.
-- **Retry Delay**: Choose how long to wait between attempts (5 to 60 seconds).
+- **Max Retries**: Number of retry attempts (1–15, plan-dependent).
+- **Retry Delay**: Base delay between attempts (5–60 seconds).
+- **Strategy**: `fixed` (constant delay) or `exponential` (increasing delay). Available strategies may vary by plan.
+- **Backoff Factor**: Multiplier for each retry when using exponential strategy (e.g., `2.0`).
+- **Max Delay**: Upper bound on delay between retries when using exponential strategy.
+- **Jitter**: Add randomness to retry timing to avoid thundering herd (exponential only).
 
 <Tip>
   Use a shorter delay for time-sensitive hooks, and a longer delay if your endpoint needs time to recover.
 </Tip>
 
+**In `posthook.toml`:**
+
+```toml
+[retry]
+attempts = 5
+strategy = "exponential"     # "fixed" or "exponential"
+delay_seconds = 15
+backoff_factor = 2.0         # exponential only
+max_delay_seconds = 3600     # exponential only
+jitter = true                # exponential only
+```
+
 ## Notifications
 
-Get notified when a hook exhausts all retry attempts.
+Configure when and how Posthook notifies you about delivery failures.
 
-1. Go to **Settings > Notifications**.
-2. Add an email address.
-3. Posthook sends an email alert when any hook in this project exhausts its retries.
+### Channels
+
+Notifications can be sent via **Email**, **Slack**, or **Custom Webhooks**. All channels receive the same alerts. Available channels may vary by plan.
+
+### Timing
+
+- **Group Wait** (`group_wait_seconds`): When a failure occurs, wait this long before sending a notification so multiple failures get grouped into one alert. Default: `120` seconds.
+- **Follow-Up Interval** (`follow_up_interval_seconds`): Minimum time between notifications for the same project. Follow-ups use exponential backoff (e.g., 15m → 30m → 1h → ... → 24h cap). Default: `900` seconds.
+
+Default timing values may vary by plan.
+
+### Anomaly Detection
+
+Posthook tracks historical failure rates per endpoint and compares them against a recent window. If failure rates spike above the baseline, an alert is triggered at the project level.
+
+- **Excess Failure Threshold** (`excess_failure_threshold`): Number of failures above baseline before alerting. `0` means alert on any excess. Default: `0`.
+- **Baseline Window** (`baseline_window_mins`): Historical window for calculating the normal failure rate. Default: `60` minutes.
+- **Recent Window** (`recent_window_mins`): Window for detecting spikes against the baseline. Default: `5` minutes.
+- **Min Deliveries** (`min_deliveries`): Minimum deliveries needed in the baseline window before anomaly detection kicks in. Prevents false alarms on low-traffic endpoints. Default: `5`.
+
+### Recovery
+
+- **Notify on Recovery** (`notify_on_recovery`): Send an alert when a failing endpoint returns to normal. Default: `true`.
+
+### Example config
+
+```toml
+[notifications]
+channels = ["oncall-slack", "eng-email"]
+group_wait_seconds = 120
+follow_up_interval_seconds = 900
+notify_on_recovery = true
+excess_failure_threshold = 0
+baseline_window_mins = 60
+recent_window_mins = 5
+min_deliveries = 5
+```
+
+## Retention
+
+Control how long Posthook stores terminal hooks (`completed` and `failed`). Pending and in-retry hooks are retained until they reach a terminal state, then the retention clock starts. After the retention period, records are permanently deleted.
+
+- **Maximum**: Determined by your plan (Free: 7, Launch: 30, Growth: 60, Scale: 90 days).
+- **Minimum**: 7 days. You can lower retention to any value between 7 days and your plan's maximum.
+
+<Warning>
+  Reducing retention permanently deletes records older than the new limit. This cannot be undone.
+</Warning>
+
+**In `posthook.toml`:**
+
+```toml
+[retention]
+days = 60
+```
 
 ## WebSocket Delivery (Beta)
 
@@ -37,10 +105,21 @@ WebSocket delivery allows you to receive webhooks on your local machine without 
 1. Toggle **WebSocket Delivery** on.
 2. Run the CLI command provided:
    ```bash
-   npx posthook listen --api-key <YOUR_KEY> --forward http://localhost:3000
+   npx posthook listen --api-key $API_KEY --forward http://localhost:3000
    ```
 3. Posthook will accept your scheduled hooks and immediately push them down the WebSocket connection to your CLI, which forwards them to your localhost.
 
 <Note>
   This is intended for development only. For production, we recommend using standard HTTPS delivery.
 </Note>
+
+## Applying changes
+
+After editing `posthook.toml`, preview and deploy:
+
+```bash
+npx posthook diff    # See what will change
+npx posthook apply   # Deploy to Posthook
+```
+
+See the [Config-as-Code guide](/essentials/config-as-code) for the full workflow.

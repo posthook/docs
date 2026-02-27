@@ -1,0 +1,16 @@
+---
+title: 'Bulk Replay Hooks'
+openapi: 'POST /hooks/bulk/replay'
+---
+
+Replay completed hooks in bulk — creating new deliveries with the same payload. Useful for re-processing hooks after a bug fix or data migration. Bulk actions availability may vary by plan.
+
+### SDK Methods
+
+| Language | By IDs | By Filter |
+| --- | --- | --- |
+| TypeScript | `posthook.hooks.bulk.replay({ hookIDs })` | `posthook.hooks.bulk.replay({ startTime, endTime, limit })` |
+| Python | `client.hooks.bulk.replay(hook_ids)` | `client.hooks.bulk.replay_by_filter(start_time, end_time, limit)` |
+| Go | `client.Hooks.Bulk().Replay(ctx, &BulkActionByIDs{})` | `client.Hooks.Bulk().ReplayByFilter(ctx, &BulkActionByFilter{})` |
+
+All methods return `{ affected: number }` — the count of hooks that were replayed.

@@ -27,6 +27,35 @@ notifySlack:
 2.  **Aggregation**: `notifySlack` waits for both snapshots to finish successfully before posting a summary.
 3.  **Reliability**: Partial failures stop the reporting step, ensuring you only report complete data.
 
+### Deploying this sequence
+
+Define the full sequence in `posthook.toml`:
+
+```toml
+[[sequences]]
+name = "daily-kpi-snapshot"
+start_at = "2026-03-01T00:00:00Z"
+
+[sequences.schedule]
+frequency = "daily"
+timezone = "America/New_York"
+time = { hour = 0, minute = 0 }
+
+[sequences.steps.snapshot-revenue]
+path = "/webhooks/metrics/revenue"
+
+[sequences.steps.snapshot-active-users]
+path = "/webhooks/metrics/active-users"
+
+[sequences.steps.notify-slack]
+path = "/webhooks/notifications/slack"
+depends_on = ["snapshot-revenue", "snapshot-active-users"]
+```
+
+```bash
+npx posthook apply
+```
+
 ## Periodic Health Checks
 
 You can run distributed health checks every few minutes to verify system uptime.

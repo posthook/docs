@@ -1,0 +1,57 @@
+---
+title: 'Teams'
+description: 'Multi-user access and role-based permissions'
+---
+
+Teams let multiple people access your Posthook account with role-based permissions.
+
+You can manage your team in the [Dashboard](https://posthook.io/app/home) under **Settings > Team**.
+
+## Roles
+
+| Role | Description |
+| --- | --- |
+| **Admin** | Full access. Can manage billing, team members, and all project settings. |
+| **Member** | Can create, view, and manage hooks, sequences, and projects. Cannot access billing or team management. |
+
+There must always be at least one admin. The last remaining admin cannot be removed or demoted.
+
+<Tip>
+  To transfer account ownership, invite the new owner as an admin. Once they accept, they can remove the original admin.
+</Tip>
+
+### Admin-only actions
+
+- Manage billing and subscription
+- Invite, remove, or change roles of team members
+- Delete the account
+
+## Inviting members
+
+1. Go to **Settings > Team** in the Dashboard.
+2. Click **Invite Member** and enter their email address.
+3. The invitee receives an email with a link to join your account.
+
+<Note>
+  Invitees must verify their email address before accepting the invitation. If they don't have a Posthook account, they'll be prompted to create one.
+</Note>
+
+Pending invitations can be revoked from the Team settings page before they are accepted.
+
+## Audit log
+
+All significant actions are recorded in the audit log, accessible from **Settings > Team > Audit Log**.
+
+Tracked actions include:
+
+- Team member additions and removals
+- Role changes
+- Project creation and deletion
+- Billing changes
+- API key and signing key rotations
+
+Each entry shows who performed the action, what changed, and when.
+
+## Limits
+
+- Maximum **25 team members** per account.

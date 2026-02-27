@@ -40,18 +40,27 @@
             "group": "Getting Started",
             "pages": [
               "index",
-              "quickstart"
+              "quickstart",
+              "essentials/how-it-works"
             ]
           },
           {
-            "group": "Essentials",
+            "group": "Core Concepts",
             "pages": [
               "essentials/authentication",
-              "essentials/hook-delivery",
-              "essentials/security",
+              "essentials/scheduling",
+              "essentials/receiving-webhooks",
+              "essentials/security"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
               "essentials/sequences",
               "essentials/project-settings",
-              "essentials/cli"
+              "essentials/teams",
+              "essentials/local-development",
+              "essentials/config-as-code"
             ]
           },
           {
@@ -61,10 +70,17 @@
               "patterns/auto-expiry",
               "patterns/polling",
               "patterns/debouncing",
-              "patterns/rate-limiting",
               "patterns/dead-letter-queue",
               "patterns/auditing",
               "patterns/recurring-tasks"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/cli",
+              "reference/errors",
+              "reference/troubleshooting"
             ]
           },
           {
@@ -87,13 +103,25 @@
               "api-reference/endpoint/get-hook",
               "api-reference/endpoint/list-hooks",
               "api-reference/endpoint/delete-hook",
-              "api-reference/endpoint/retry-hooks"
+              "api-reference/endpoint/bulk-retry",
+              "api-reference/endpoint/bulk-replay",
+              "api-reference/endpoint/bulk-cancel"
             ]
           }
         ]
       }
     ]
   },
+  "redirects": [
+    {
+      "source": "/essentials/hook-delivery",
+      "destination": "/essentials/receiving-webhooks"
+    },
+    {
+      "source": "/essentials/cli",
+      "destination": "/reference/cli"
+    }
+  ],
   "api": {
     "openapi": "openapi.json"
   },

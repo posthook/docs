@@ -1,61 +1,121 @@
 ---
-title: Welcome to Posthook
+title: Overview
 description: 'Schedule webhooks for exactly when you need them. Reliable delivery with automatic retries.'
 ---
-
-
-
 
 ## What is Posthook?
 
 Posthook is a simple API for scheduling webhooks. Set a time, provide a payload, and we deliver it to your endpoint. Full visibility into every hook from the dashboard.
 
+**Send a reminder email 24 hours before a meeting:**
+
 <CodeGroup>
-```bash Schedule a Hook
+```typescript TypeScript
+import Posthook from '@posthook/node';
+const posthook = new Posthook('phk_your_api_key');
+
+const hook = await posthook.hooks.schedule({
+  path: '/webhooks/meeting-reminder',
+  postAt: '2026-03-14T12:00:00Z',
+  data: {
+    user_id: 'usr_123',
+    meeting_id: 'mtg_456',
+    message: 'Your meeting starts in 24 hours'
+  }
+});
+```
+
+```python Python
+from posthook import Posthook
+
+client = Posthook("phk_your_api_key")
+
+hook = client.hooks.schedule(
+    "/webhooks/meeting-reminder",
+    post_at="2026-03-14T12:00:00Z",
+    data={
+        "user_id": "usr_123",
+        "meeting_id": "mtg_456",
+        "message": "Your meeting starts in 24 hours"
+    }
+)
+```
+
+```go Go
+client, _ := posthook.NewClient("phk_your_api_key")
+
+hook, _, _ := client.Hooks.Schedule(context.Background(), &posthook.HookScheduleParams{
+    Path:   "/webhooks/meeting-reminder",
+    PostAt: time.Date(2026, 3, 14, 12, 0, 0, 0, time.UTC),
+    Data:   map[string]string{
+        "user_id":    "usr_123",
+        "meeting_id": "mtg_456",
+        "message":    "Your meeting starts in 24 hours",
+    },
+})
+```
+
+```bash curl
 curl -X POST https://api.posthook.io/v1/hooks \
-  -H "X-API-Key: <YOUR_KEY>" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
   -d '{
-    "path": "/webhooks/remind",
-    "postAt": "2025-01-01T12:00:00Z",
-    "data": { "user_id": "123" }
+    "path": "/webhooks/meeting-reminder",
+    "postAt": "2026-03-14T12:00:00Z",
+    "data": {
+      "user_id": "usr_123",
+      "meeting_id": "mtg_456",
+      "message": "Your meeting starts in 24 hours"
+    }
   }'
 ```
 </CodeGroup>
+
+## Use Cases
+
+Posthook replaces cron jobs and internal task queues for time-based workflows:
+
+- **[Reminder emails](/patterns/user-engagement)** — Send onboarding drips, meeting reminders, or follow-ups at the right time.
+- **[Trial expirations](/patterns/auto-expiry)** — Schedule a hook when a trial starts to check status and downgrade at expiry.
+- **[Abandoned cart recovery](/patterns/user-engagement)** — Nudge users who left items in their cart after a delay.
+- **[Scheduled reports](/patterns/recurring-tasks)** — Generate and deliver reports on a recurring schedule.
+- **[Polling 3rd-party APIs](/patterns/polling)** — Turn any status-check API into an async webhook with recursive polling.
+
+## When to Use Posthook
+
+Posthook is not a job queue. It's designed for scheduled, time-based webhooks — not high-volume fire-and-forget background jobs. If you need to process thousands of jobs per minute in real time, use a dedicated queue like SQS, BullMQ, or Celery. Posthook is built for use cases where *when* something happens matters: reminders, expirations, scheduled reports, and recurring workflows.
 
 ## Core Features
 
 Posthook is built around two primary use cases:
 
 ### 1. One-Time Callbacks
-Schedule HTTP requests to be delivered at a specific time in the future. Ideal for:
-- Sending email reminders
-- Delayed job processing
-- Trial expiration checks
+Schedule HTTP requests to be delivered at a specific time in the future. Ideal for delayed job processing, notifications, and expiration checks.
 
 [**Start Scheduling**](/api-reference/endpoint/create-hook)
 
 ### 2. Recurring Workflows (Sequences)
-Chain multiple hooks together to create complex, time-based workflows. Sequences allow you to:
-- Run steps in parallel or series
-- Handle dependencies (Step B waits for Step A)
-- Schedule recurring jobs
+Chain multiple hooks together to create complex, time-based workflows. Sequences allow you to run steps in parallel or series, handle dependencies, and schedule recurring jobs.
 
 [**Learn about Sequences**](/essentials/sequences)
 
 ## Platform Features
 
 <CardGroup cols={2}>
-  <Card title="Reliability" icon="shield-check" href="/essentials/hook-delivery">
-    Automatic retries with configurable backoff.
+  <Card title="At-Least-Once Delivery" icon="shield-check" href="/essentials/receiving-webhooks">
+    Automatic retries with configurable backoff ensure your hooks always arrive.
   </Card>
-  <Card title="Security" icon="fingerprint" href="/essentials/security">
-    Cryptographic signatures on every request.
+  <Card title="Signature Verification" icon="fingerprint" href="/essentials/security">
+    Cryptographic signatures on every request so you can verify authenticity.
   </Card>
-  <Card title="Local Dev" icon="terminal" href="/essentials/cli">
-    Test hooks locally with our CLI.
+  <Card title="Local Development" icon="terminal" href="/essentials/local-development">
+    Receive hooks on localhost with the CLI — no tunneling tools needed.
   </Card>
-  <Card title="Dashboard" icon="eye" href="https://posthook.io/app/home">
-    View recent activity and upcoming hooks in real-time.
+  <Card title="Real-Time Dashboard" icon="eye" href="https://posthook.io/app/home">
+    Inspect payloads, track delivery status, and debug failures in real-time.
+  </Card>
+  <Card title="Config-as-Code" icon="file-code" href="/essentials/config-as-code">
+    Define sequences and settings in version-controlled TOML.
   </Card>
 </CardGroup>
 
@@ -72,10 +132,10 @@ Ready to start scheduling?
     Send your first scheduled webhook in under 2 minutes.
   </Card>
   <Card
-    title="CLI Tool"
-    icon="terminal"
-    href="/essentials/cli"
+    title="How Posthook Works"
+    icon="diagram-project"
+    href="/essentials/how-it-works"
   >
-    Develop locally without exposing your localhost to the internet.
+    Understand the hook lifecycle from scheduling to delivery.
   </Card>
 </CardGroup>

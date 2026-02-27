@@ -1,0 +1,16 @@
+---
+title: 'Bulk Retry Hooks'
+openapi: 'POST /hooks/bulk/retry'
+---
+
+Retry failed hooks in bulk — either by specifying individual hook IDs or by applying a time-range filter. Bulk actions availability may vary by plan.
+
+### SDK Methods
+
+| Language | By IDs | By Filter |
+| --- | --- | --- |
+| TypeScript | `posthook.hooks.bulk.retry({ hookIDs })` | `posthook.hooks.bulk.retry({ startTime, endTime, limit })` |
+| Python | `client.hooks.bulk.retry(hook_ids)` | `client.hooks.bulk.retry_by_filter(start_time, end_time, limit)` |
+| Go | `client.Hooks.Bulk().Retry(ctx, &BulkActionByIDs{})` | `client.Hooks.Bulk().RetryByFilter(ctx, &BulkActionByFilter{})` |
+
+All methods return `{ affected: number }` — the count of hooks that were retried.

@@ -1,0 +1,62 @@
+---
+title: 'Local Development'
+description: 'Receive webhooks on localhost without tunnels or public URLs'
+---
+
+The Posthook CLI helps you develop and test your webhooks locally. Receive hooks directly on your machine — no tunneling tools needed.
+
+## Installation
+
+No global installation required. Run the CLI on-demand with `npx`.
+
+```bash
+npx posthook <command>
+```
+
+## Login
+
+Prompts for your API Key (found in Dashboard Settings) and stores it in `~/.posthook/config.json`.
+
+```bash
+npx posthook login
+```
+
+## Logout
+
+Clears stored API keys from `~/.posthook/config.json`.
+
+```bash
+npx posthook logout
+```
+
+## Listen
+
+Connects to Posthook via WebSocket and forwards incoming webhooks to a local URL.
+
+```bash
+npx posthook listen --forward <LOCAL_URL>
+```
+
+**Options**:
+- `-f, --forward <url>`: Local URL to forward requests to (e.g., `http://localhost:3000`).
+- `-k, --api-key <key>`: Manually specify an API key instead of using the logged-in user's key.
+- `-v, --verbose`: Show full headers and body for forwarded requests.
+- `--debug <file>`: Write debug log to a file (payloads are redacted).
+
+**Example**:
+```bash
+npx posthook listen --forward http://localhost:8080
+```
+
+### Forward mode
+
+When `--forward` is specified, the CLI forwards each incoming hook as an HTTP POST to the given URL. The request is identical to the one Posthook would make via HTTPS in production — same payload, same headers (`Posthook-Id`, `Posthook-Timestamp`, `Posthook-Signature`, `X-Ph-Signature`, `Authorization`) — so your handler code works the same locally as it does in production.
+
+The CLI reports the response status from your local server and automatically accepts or fails the hook based on the HTTP status code (2xx = accept, anything else = fail). Hooks are processed in parallel with no user interaction required.
+
+### Interactive mode
+
+Without `--forward`, the CLI enters interactive mode. Each hook is presented one at a time with its ID, path, timestamps, payload, and attempt history. When a hook arrives you can:
+- **Accept (A)**: Mark as delivered successfully.
+- **Fail (F)**: Reject and trigger retry.
+- **Skip (S)**: Skip without responding (the server will time out and retry).

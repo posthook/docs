@@ -4,45 +4,136 @@ description: Latest updates and improvements to Posthook
 ---
 
 <Note>
-  Have a feature request? [Share it on GitHub](https://github.com/posthook/community/discussions/new?category=feature-requests).
+  Have a feature request? [Let us know](https://github.com/posthook/community/discussions/new?category=feature-requests).
 </Note>
 
 ---
 
-## December, 2025
+## February 2026
 
-**New: Posthook CLI**
+**Official SDKs**
 
-Receive webhooks directly to your local machine for development and testing. No tunnels or public URLs required.
+First-class SDKs for TypeScript, Python, and Go with built-in authentication, pagination, and signature verification.
+
+<CodeGroup>
+
+```bash TypeScript
+npm install @posthook/node
+```
+
+```bash Python
+pip install posthook-python
+```
+
+```bash Go
+go get github.com/posthook/posthook-go
+```
+
+</CodeGroup>
+
+**[Bulk Actions](/api-reference/endpoint/bulk-retry)**
+
+Retry, replay, or cancel hooks in bulk — by IDs or by time-range filter.
+
+```typescript
+const result = await posthook.hooks.bulk.retry({
+  hookIDs: ['e5405623-...', 'a1b2c3d4-...']
+});
+```
+
+**[Timezone-Aware Scheduling](/essentials/scheduling)**
+
+Schedule hooks at a local time with `postAtLocal` + `timezone`. Posthook resolves DST gaps and folds automatically.
+
+```bash
+curl -X POST https://api.posthook.io/v1/hooks \
+  -H "X-API-Key: $POSTHOOK_API_KEY" \
+  -d '{
+    "path": "/webhooks/send-reminder",
+    "postAtLocal": "2026-03-15T09:00:00",
+    "timezone": "America/New_York",
+    "data": { "user_id": "usr_123" }
+  }'
+```
+
+**[Calendar Schedules for Sequences](/essentials/sequences#calendar-scheduling)**
+
+Sequences now support calendar-based scheduling (hourly, daily, weekly, monthly) with timezone support for running workflows at specific clock times.
+
+**[Per-Hook Retry Override](/essentials/scheduling#per-hook-retry-override)**
+
+Override your project's default retry settings on individual hooks — strategy, delay, backoff, and jitter.
+
+**[Relative Delay Scheduling](/essentials/scheduling#relative-delay-with-postin)**
+
+Schedule hooks relative to now using duration strings like `"5m"`, `"2h"`, or `"1d12h"`.
+
+**[Config-as-Code](/essentials/config-as-code)**
+
+Manage project settings declaratively with `posthook.toml`. Pull, diff, and apply configuration changes from the CLI. Supports multi-environment configs via `--config`.
+
+**[Usage Quota Headers](/essentials/scheduling#quota-headers)**
+
+`POST /hooks` responses now include `Posthook-HookQuota-*` headers showing plan usage, remaining quota, and reset time.
+
+**Endpoint Pattern Normalization**
+
+Endpoint paths are now normalized for consistent analytics grouping.
+
+---
+
+## January 2026
+
+**[Team Management](/essentials/teams)**
+
+Invite team members with role-based access. Admins manage billing and settings; members manage hooks and projects. All activity is tracked in a built-in audit log.
+
+**Account Closure**
+
+Close your account from Dashboard Settings. A grace period allows you to reactivate before data is permanently deleted.
+
+**[Notification Channels](/essentials/project-settings#notifications)**
+
+Send failure and recovery alerts to Slack, custom webhooks, or email. Configure per-project in Settings or `posthook.toml`.
+
+**Duplicate Delivery Prevention**
+
+Added a deduplication layer as an extra safeguard against duplicate deliveries during degraded conditions. Your handlers should still be [idempotent](/essentials/receiving-webhooks#idempotency), but this adds another layer of protection.
+
+**Usage Alerts**
+
+Automatic email notifications at 75%, 100%, and 150% of your plan's hook quota.
+
+---
+
+## December 2025
+
+**[Posthook CLI](/essentials/local-development)**
+
+Receive webhooks on your local machine — no tunnels or public URLs required.
 
 ```bash
 npx posthook listen --forward http://localhost:8080
 ```
 
-- Forward webhooks to any local URL
+- Forward hooks to any local URL
 - Works behind firewalls and NAT
 - Automatic reconnection on connection loss
 
-**Improved: Failure Notifications**
+**Smarter Failure Notifications**
 
-Smarter failure notifications:
 - Baseline tracking for endpoint error rates
 - Grouped notifications to reduce alert fatigue
-- Follow-up notifications for persistent issues
-- Stale endpoint detection to stop tracking endpoints that have adapted
+- Follow-up alerts for persistent issues
+- Recovery emails when endpoints recover
 - Detailed error classifications
-- Recovery emails
 
-**Improved: Activity Page**
+**Activity Page**
 
-- Real-time refresh showing latest webhook deliveries
-- Faster queries for improved performance
+- Real-time refresh showing latest deliveries
+- Faster queries
 
-**Improved: Dashboard UX**
+**Dashboard UX**
 
-- Better navigation and layout
+- Improved navigation and layout
 - Streamlined project settings
-
----
-
-*More updates coming soon. Check back regularly or follow us on [X](https://x.com/posthook) for announcements.*

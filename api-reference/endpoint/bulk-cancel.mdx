@@ -1,0 +1,16 @@
+---
+title: 'Bulk Cancel Hooks'
+openapi: 'POST /hooks/bulk/cancel'
+---
+
+Cancel pending hooks in bulk. Cancelled hooks will not be delivered. Bulk actions availability may vary by plan.
+
+### SDK Methods
+
+| Language | By IDs | By Filter |
+| --- | --- | --- |
+| TypeScript | `posthook.hooks.bulk.cancel({ hookIDs })` | `posthook.hooks.bulk.cancel({ startTime, endTime, limit })` |
+| Python | `client.hooks.bulk.cancel(hook_ids)` | `client.hooks.bulk.cancel_by_filter(start_time, end_time, limit)` |
+| Go | `client.Hooks.Bulk().Cancel(ctx, &BulkActionByIDs{})` | `client.Hooks.Bulk().CancelByFilter(ctx, &BulkActionByFilter{})` |
+
+All methods return `{ affected: number }` — the count of hooks that were cancelled.

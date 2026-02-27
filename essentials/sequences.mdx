@@ -1,28 +1,29 @@
 ---
 title: 'Sequences'
-description: 'Chain hooks together with dependencies'
+description: 'Recurring workflows with dependency graphs and flexible scheduling'
 ---
 
-Sequences let you define workflows where multiple hooks run in a specific order. You can define dependencies between steps, ensuring `Step B` only runs after `Step A` succeeds.
+Sequences let you define recurring workflows where multiple hooks fire on a schedule. Steps can declare dependencies, so downstream hooks only run after their prerequisites succeed.
 
-## How it works
+## Overview
 
 A sequence is defined by:
-1. **Start Time**: When the first step(s) should start.
-2. **Interval**: How often the sequence repeats (optional).
-3. **Steps**: A collection of hooks to fire.
+1. **Steps**: The hooks to deliver, with optional dependencies.
+2. **Schedule**: When and how often the sequence runs (interval or calendar).
+3. **Start time**: When the first run begins.
+4. **End time** (optional): When the sequence stops running. After this time, no further runs are produced.
 
-## Configuration
+Sequences are created and managed in the [Dashboard](https://posthook.io/app/home).
 
-Sequences are configured using YAML. Each key in the YAML object represents a step name.
+## Steps
 
-### Example
-
-Here is a common pattern for a data synchronization workflow:
+Each step defines a hook to fire when the sequence runs. Steps are configured using YAML, where each key is a step name.
 
 ```yaml
 syncData:
   path: /webhooks/posthook/sync
+  data:
+    source: "crm"
 cleanupOldRecords:
   path: /webhooks/posthook/cleanup
 notify:
@@ -32,17 +33,190 @@ notify:
     - cleanupOldRecords
 ```
 
-### Breakdown
-- **syncData** and **cleanupOldRecords** have no `requires` field, so they start immediately in parallel.
-- **notify** waits until *both* `syncData` and `cleanupOldRecords` have successfully completed (returned a 2xx response).
-- If any dependency fails, dependent steps do not run.
+<Note>
+  In the Dashboard, steps are defined using YAML. In `posthook.toml`, the same structure uses TOML syntax — see [Managing sequences](#config-as-code-recommended) below.
+</Note>
 
-## Managing Sequences
+### Step fields
 
-You can create and manage sequences directly in the [Dashboard](https://posthook.io/app/home).
+| Field | Description |
+| --- | --- |
+| `path` | Endpoint path for delivery (combined with your project domain) |
+| `data` | Optional JSON payload delivered with the hook |
+| `requires` | Optional list of step names that must succeed (2xx) before this step runs |
 
-## Usage Patterns
+### Dependency graph
 
-- [**Dead Letter Queue**](/patterns/dead-letter-queue): Handle hooks that have failed all retries.
-- [**Auditing**](/patterns/auditing): Double-check important hooks ran.
+Steps without `requires` run immediately when the sequence fires. Steps with `requires` wait until all listed dependencies complete successfully.
+
+In the example above:
+- **syncData** and **cleanupOldRecords** have no dependencies, so they start in parallel.
+- **notify** waits until both complete with a 2xx response.
+- If a dependency fails, dependent steps do not run for that execution.
+
+### Limits
+
+- Maximum **5 steps** per sequence (may vary by plan).
+- Maximum **64 KB** of data per step.
+
+## Scheduling
+
+Each sequence uses exactly one scheduling type: **interval** or **calendar**.
+
+### Interval scheduling
+
+Interval schedules repeat at a fixed cadence from the start time.
+
+| Unit | Allowed values |
+| --- | --- |
+| `months` | 1, 2, 3, 6, 12 |
+| `days` | 1, 2, 3, 5, 7, 14, 21, 28 |
+| `hours` | 1, 2, 3, 4, 5, 6, 12 |
+| `minutes` | 5, 10, 15, 20, 30, 60, 90 |
+
+An interval of 7 days starting at `2026-03-01T09:00:00Z` fires on March 1, March 8, March 15, and so on.
+
+**In `posthook.toml`:**
+
+```toml
+[[sequences]]
+name = "weekly-sync"
+start_at = "2026-03-01T09:00:00Z"
+
+[sequences.interval]
+count = 7
+unit = "days"
+```
+
+### Calendar scheduling
+
+Calendar schedules run at specific clock times, on specific days, in a specific timezone.
+
+| Field | Description |
+| --- | --- |
+| `frequency` | `hourly`, `daily`, `weekly`, or `monthly` |
+| `hour` | Hour of day (0–23) |
+| `minute` | Minute of hour (0–59) |
+| `timezone` | IANA timezone (e.g., `America/New_York`) |
+| `onDays` | Days of the week (e.g., `["monday", "wednesday", "friday"]`) |
+| `onDates` | Days of the month (e.g., `[1, 15]`, or negative values like `[-1]` for last day) |
+| `everyN` | Run every N intervals (e.g., every 2 hours, every 3 weeks) |
+
+### Calendar field rules
+
+Not all field combinations are valid.
+
+| Field | Hourly | Daily | Weekly | Monthly |
+| --- | --- | --- | --- | --- |
+| `hour` | Forbidden | Required | Required | Required |
+| `minute` | Optional (defaults to 0) | Required | Required | Required |
+| `timezone` | Required | Required | Required | Required |
+| `onDays` | Forbidden | Forbidden | Required | Forbidden |
+| `onDates` | Forbidden | Forbidden | Forbidden | Required |
+| `everyN` | Optional | Optional | Optional | Optional |
+
+**Examples**:
+
+- **Daily at 9:00 AM Eastern**: frequency `daily`, hour `9`, minute `0`, timezone `America/New_York`
+- **Weekly on Mon/Wed/Fri at 8:30 AM**: frequency `weekly`, hour `8`, minute `30`, timezone `America/Chicago`, onDays `["monday", "wednesday", "friday"]`
+- **Monthly on the 1st and 15th at noon**: frequency `monthly`, hour `12`, minute `0`, timezone `Europe/London`, onDates `[1, 15]`
+- **Every 2 hours at :00**: frequency `hourly`, timezone `UTC`, everyN `2`
+- **Every hour at :30**: frequency `hourly`, minute `30`, timezone `America/New_York`
+
+**In `posthook.toml`:**
+
+```toml
+[[sequences]]
+name = "daily-report"
+start_at = "2026-03-01T09:00:00Z"
+
+[sequences.schedule]
+frequency = "daily"
+timezone = "America/New_York"
+time = { hour = 9, minute = 0 }
+```
+
+<Note>
+  `everyN` is anchored to the sequence's start time, not the most recent run. For example, `everyN: 2` with a weekly schedule starting on January 6 always fires on even-numbered weeks from that date, regardless of when the last run actually occurred.
+</Note>
+
+## Short months and leap years
+
+If a monthly schedule is configured for a date that doesn't exist in a given month, that month is skipped. There is no clamping.
+
+- A schedule on the **30th** skips February (28 or 29 days) and runs in the other 11 months.
+- A schedule on the **31st** only runs in months with 31 days (January, March, May, July, August, October, December).
+
+To run on the last day of every month regardless of length, use a negative value: `onDates: [-1]`. Negative values count from the end of the month (`-1` = last day, `-2` = second to last, etc.).
+
+## DST handling
+
+Calendar schedules handle Daylight Saving Time transitions automatically:
+
+- **Spring forward (gap)**: If the scheduled time falls in a skipped hour (e.g., 2:30 AM when clocks jump from 2:00 to 3:00), the run shifts forward to the first valid time after the gap.
+- **Fall back (fold)**: If the scheduled time occurs twice (e.g., 1:30 AM when clocks fall back from 2:00 to 1:00), the earlier occurrence is used.
+
+## Managing sequences
+
+### Config-as-code (recommended)
+
+Define sequences in `posthook.toml` alongside your application code. This gives you version control, code review, and repeatable deployments.
+
+**1. Initialize** — Pull your current project config into a TOML file:
+
+```bash
+npx posthook init
+```
+
+**2. Define a sequence** — Add a `[[sequences]]` block:
+
+```toml
+[[sequences]]
+name = "daily-health-check"
+start_at = "2026-03-01T06:00:00Z"
+
+[sequences.schedule]
+frequency = "daily"
+timezone = "America/Chicago"
+time = { hour = 6, minute = 0 }
+
+[sequences.steps.check-api]
+path = "/webhooks/health/api"
+data = { service = "api" }
+
+[sequences.steps.check-db]
+path = "/webhooks/health/db"
+data = { service = "database" }
+
+[sequences.steps.report]
+path = "/webhooks/health/report"
+depends_on = ["check-api", "check-db"]
+```
+
+<Note>
+  In TOML config, step dependencies use `depends_on`. In the Dashboard and API, the same concept is called `requires`.
+</Note>
+
+**3. Preview and deploy**:
+
+```bash
+npx posthook validate   # Check syntax locally
+npx posthook diff       # Preview what will change
+npx posthook apply      # Deploy to Posthook
+```
+
+<Tip>
+  Check `posthook.toml` into git. Use [multi-environment configs](/essentials/config-as-code#multi-environment-configs) (`posthook.staging.toml`, `posthook.prod.toml`) to manage sequences across environments.
+</Tip>
+
+See the [Config-as-Code guide](/essentials/config-as-code) for the full list of commands and TOML schema.
+
+### Dashboard
+
+You can also create and manage sequences in the [Dashboard](https://posthook.io/app/home).
+
+## Usage patterns
+
 - [**Recurring Tasks**](/patterns/recurring-tasks): Schedule daily reports, health checks, or database maintenance.
+- [**Dead Letter Queue**](/patterns/dead-letter-queue): Automate periodic processing of failed hooks.
+- [**Auditing**](/patterns/auditing): Double-check important hooks ran.

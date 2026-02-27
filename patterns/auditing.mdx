@@ -8,8 +8,45 @@ You can use the List Hooks API to reconcile your internal state with Posthook's 
 ## Workflow
 
 1.  **List Completed Hooks**:
-    ```bash
-    GET /hooks?status=posted&postAtAfter=2025-01-01T00:00:00Z
+    <CodeGroup>
+
+    ```typescript TypeScript
+    for await (const hook of posthook.hooks.listAll({
+      status: 'completed',
+      postAtAfter: '2025-01-01T00:00:00Z'
+    })) {
+      // Compare with your internal records
+      console.log(hook.id, hook.path, hook.data);
+    }
     ```
+
+    ```python Python
+    for hook in client.hooks.list_all(
+        status="completed",
+        post_at_after="2025-01-01T00:00:00Z"
+    ):
+        # Compare with your internal records
+        print(hook.id, hook.path, hook.data)
+    ```
+
+    ```go Go
+    for hook, err := range client.Hooks.ListAll(ctx, &posthook.HookListAllParams{
+        Status:      "completed",
+        PostAtAfter: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+    }) {
+        if err != nil {
+            log.Fatal(err)
+        }
+        // Compare with your internal records
+        fmt.Println(hook.ID, hook.Path, string(hook.Data))
+    }
+    ```
+
+    ```bash curl
+    curl "https://api.posthook.io/v1/hooks?status=completed&postAtAfter=2025-01-01T00:00:00Z" \
+      -H "X-API-Key: $API_KEY"
+    ```
+
+    </CodeGroup>
 2.  **Verify**: Iterate through the list and compare against your own transaction logs.
 3.  **Alert**: Flag any discrepancies (e.g., a transaction marked "processed" in your DB but missing a corresponding webhook).

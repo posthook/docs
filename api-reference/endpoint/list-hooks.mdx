@@ -3,7 +3,25 @@ title: 'List Hooks'
 openapi: 'GET /hooks'
 ---
 
-List your webhooks.
+List your webhooks with cursor-based pagination.
+
+## Cursor-Based Pagination
+
+Results are paginated using an opaque cursor. Pass the `cursor` from the previous response to fetch the next page. When no more results are available, no cursor is returned.
+
+<Note>
+  The `offset` parameter has been removed. Use `cursor` for pagination instead.
+</Note>
+
+### SDK Methods
+
+| Language | Single Page | Auto-Paginate |
+| --- | --- | --- |
+| TypeScript | `posthook.hooks.list({ status, limit })` | `posthook.hooks.listAll({ status })` |
+| Python | `client.hooks.list(status, limit)` | `client.hooks.list_all(status)` |
+| Go | `client.Hooks.List(ctx, &HookListParams{})` | `client.Hooks.ListAll(ctx, &HookListAllParams{})` |
+
+The `listAll` / `list_all` / `ListAll` methods return an iterator that handles cursor pagination automatically.
 
 ## Usage Patterns
 
@@ -11,5 +29,3 @@ Common patterns for this endpoint include:
 - [**Dead Letter Queue**](/patterns/dead-letter-queue): Process failures within a specific time window.
 - [**Bulk Retry**](/patterns/dead-letter-queue#bulk-retry): Batch retry failed hooks.
 - [**Auditing**](/patterns/auditing): Reconcile Posthook delivery logs with your internal records.
-
-

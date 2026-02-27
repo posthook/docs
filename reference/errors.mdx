@@ -1,0 +1,159 @@
+---
+title: 'API Errors'
+description: 'Error codes, response format, and how to handle them'
+---
+
+When an API request fails, Posthook returns a JSON error response with an HTTP status code and a descriptive message.
+
+## Error Response Format
+
+```json
+{
+  "error": "path is required"
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `error` | A human-readable string describing what went wrong. |
+
+## Error Codes
+
+### 400 Bad Request
+
+The request body is malformed or fails validation.
+
+```json
+{
+  "error": "path is required"
+}
+```
+
+**Common causes:**
+- Missing required fields (`path`, `data`)
+- Invalid `postAt` format (must be RFC 3339)
+- Providing both `postAt` and `postIn` (mutually exclusive)
+- `postAtLocal` without `timezone`
+- Payload exceeds 64 KB
+
+**Fix:** Check the [API Reference](/api-reference/endpoint/create-hook) for required fields and valid values.
+
+### 401 Unauthorized
+
+The API key is missing or invalid.
+
+```json
+{
+  "error": "Invalid API key"
+}
+```
+
+**Common causes:**
+- Missing `X-API-Key` header
+- Invalid or revoked API key
+- Using a signing key instead of an API key
+
+**Fix:** Verify your API key in **Project Settings** in the [Dashboard](https://posthook.io/app/home).
+
+### 404 Not Found
+
+The requested resource does not exist.
+
+```json
+{
+  "error": "Hook not found"
+}
+```
+
+**Common causes:**
+- Hook ID does not exist or belongs to a different project
+- Endpoint path is incorrect
+
+### 413 Payload Too Large
+
+The request body exceeds the maximum allowed size.
+
+```json
+{
+  "error": "Payload exceeds 64 KB limit"
+}
+```
+
+**Fix:** Reduce the size of your `data` field. If you need to send large payloads, store the data externally and include a reference URL in the hook payload.
+
+### 429 Too Many Requests
+
+You've exceeded your plan's monthly hook quota.
+
+```json
+{
+  "error": "Rate limit exceeded"
+}
+```
+
+**Fix:** Check your usage with the `Posthook-HookQuota-*` [response headers](/essentials/scheduling#quota-headers), or upgrade your plan.
+
+### 500 Internal Server Error
+
+An unexpected error occurred on Posthook's end.
+
+```json
+{
+  "error": "An unexpected error occurred"
+}
+```
+
+**Fix:** Retry the request with backoff. If the issue persists, contact [support@posthook.io](mailto:support@posthook.io).
+
+## SDK Error Handling
+
+<CodeGroup>
+
+```typescript TypeScript
+import Posthook, { PosthookError } from '@posthook/node';
+
+const posthook = new Posthook('phk_your_api_key');
+
+try {
+  const hook = await posthook.hooks.schedule({
+    path: '/webhooks/remind',
+    postAt: '2026-03-14T12:00:00Z',
+    data: { user_id: '123' }
+  });
+} catch (err) {
+  if (err instanceof PosthookError) {
+    console.error(err.status, err.code, err.message);
+  }
+}
+```
+
+```python Python
+from posthook import Posthook, PosthookError
+
+client = Posthook("phk_your_api_key")
+
+try:
+    hook = client.hooks.schedule(
+        "/webhooks/remind",
+        post_at="2026-03-14T12:00:00Z",
+        data={"user_id": "123"}
+    )
+except PosthookError as err:
+    print(err.status, err.code, err.message)
+```
+
+```go Go
+hook, resp, err := client.Hooks.Schedule(ctx, &posthook.HookScheduleParams{
+    Path:   "/webhooks/remind",
+    PostAt: time.Date(2026, 3, 14, 12, 0, 0, 0, time.UTC),
+    Data:   map[string]string{"user_id": "123"},
+})
+if err != nil {
+    var apiErr *posthook.Error
+    if errors.As(err, &apiErr) {
+        fmt.Println(apiErr.StatusCode, apiErr.Code, apiErr.Message)
+    }
+}
+```
+
+</CodeGroup>

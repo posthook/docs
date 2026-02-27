@@ -1,0 +1,35 @@
+---
+title: 'CLI'
+description: 'Command reference for the Posthook CLI'
+---
+
+## Installation
+
+No global installation required. Run the CLI on-demand with `npx`.
+
+```bash
+npx posthook <command>
+```
+
+## Commands
+
+| Command | Description |
+| --- | --- |
+| `login` | Store your Posthook API key |
+| `logout` | Clear stored API keys |
+| `listen` | [Receive webhooks on localhost](/essentials/local-development#listen) via WebSocket |
+| `init` | [Pull remote config](/essentials/config-as-code#init) into a local `posthook.toml` |
+| `pull` | [Download remote config](/essentials/config-as-code#pull), overwriting the local file |
+| `apply` | [Push local config](/essentials/config-as-code#apply) to the remote project |
+| `diff` | [Show pending changes](/essentials/config-as-code#diff) between local and remote |
+| `status` | [Display project info](/essentials/config-as-code#status), signing key, and masked API key |
+| `validate` | [Check TOML syntax](/essentials/config-as-code#validate) locally without an API call |
+
+## Common flags
+
+| Flag | Applies to | Description |
+| --- | --- | --- |
+| `-k, --api-key <key>` | `listen`, `init`, `pull`, `apply`, `diff` | Override the stored API key |
+| `-c, --config <name>` | `init`, `pull`, `apply`, `diff`, `status`, `validate` | Use a named config file (`posthook.<name>.toml`) |
+
+You can also set the `POSTHOOK_API_KEY` environment variable instead of using `--api-key`.

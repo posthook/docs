@@ -8,9 +8,43 @@ The List Hooks endpoint can function as a Dead Letter Queue (DLQ). You can fetch
 ## Workflow
 
 1.  **List Failed Hooks**: Use `status=failed` and filters like `postAtAfter` (e.g., "yesterday").
-    ```bash
-    GET /hooks?status=failed&postAtAfter=2025-01-01T00:00:00Z
+    <CodeGroup>
+
+    ```typescript TypeScript
+    for await (const hook of posthook.hooks.listAll({
+      status: 'failed',
+      postAtAfter: '2025-01-01T00:00:00Z'
+    })) {
+      console.log(hook.id, hook.path);
+    }
     ```
+
+    ```python Python
+    for hook in client.hooks.list_all(
+        status="failed",
+        post_at_after="2025-01-01T00:00:00Z"
+    ):
+        print(hook.id, hook.path)
+    ```
+
+    ```go Go
+    for hook, err := range client.Hooks.ListAll(ctx, &posthook.HookListAllParams{
+        Status:      posthook.StatusFailed,
+        PostAtAfter: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+    }) {
+        if err != nil {
+            log.Fatal(err)
+        }
+        fmt.Println(hook.ID, hook.Path)
+    }
+    ```
+
+    ```bash curl
+    curl "https://api.posthook.io/v1/hooks?status=failed&postAtAfter=2025-01-01T00:00:00Z" \
+      -H "X-API-Key: $API_KEY"
+    ```
+
+    </CodeGroup>
 2.  **Process**: Iterate through the list and handle the failures (e.g., log them, alert a team, or manually fix the data).
 3.  **Delete**: Once processed, delete the hook to remove it from the queue.
     ```bash
@@ -26,11 +60,38 @@ The List Hooks endpoint can function as a Dead Letter Queue (DLQ). You can fetch
 If you had a temporary outage (e.g., your database was down), you can batch retry failures instead of deleting them.
 
 1.  **List Failed Hooks** (as above).
-2.  **Extract IDs**: Collect the `id` from each hook.
-3.  **Batch Retry**:
-    ```bash
-    POST /hooks/retryIDs
-    {
-      "hookIDs": ["hook_1", "hook_2", "hook_3"]
-    }
+2.  **Extract IDs**: Collect the `id` from each hook (or use the SDK's bulk retry directly).
+3.  **Bulk Retry**:
+    <CodeGroup>
+
+    ```typescript TypeScript
+    const result = await posthook.hooks.bulk.retry({
+      hookIDs: ['e5405623-2c1c-460e-9737-c884f7f59035', 'a1b2c3d4-5678-90ab-cdef-1234567890ab', 'f9e8d7c6-5432-10fe-dcba-0987654321fe']
+    });
+    console.log(`Retried ${result.affected} hooks`);
     ```
+
+    ```python Python
+    result = client.hooks.bulk.retry(
+        hook_ids=["e5405623-2c1c-460e-9737-c884f7f59035", "a1b2c3d4-5678-90ab-cdef-1234567890ab", "f9e8d7c6-5432-10fe-dcba-0987654321fe"]
+    )
+    print(f"Retried {result.affected} hooks")
+    ```
+
+    ```go Go
+    result, _, err := client.Hooks.Bulk().Retry(ctx, &posthook.BulkActionByIDs{
+        HookIDs: []string{"e5405623-2c1c-460e-9737-c884f7f59035", "a1b2c3d4-5678-90ab-cdef-1234567890ab", "f9e8d7c6-5432-10fe-dcba-0987654321fe"},
+    })
+    fmt.Printf("Retried %d hooks\n", result.Affected)
+    ```
+
+    ```bash curl
+    curl -X POST https://api.posthook.io/v1/hooks/bulk/retry \
+      -H "X-API-Key: $API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "hookIDs": ["e5405623-2c1c-460e-9737-c884f7f59035", "a1b2c3d4-5678-90ab-cdef-1234567890ab", "f9e8d7c6-5432-10fe-dcba-0987654321fe"]
+      }'
+    ```
+
+    </CodeGroup>
