@@ -107,6 +107,12 @@ time = { hour = 6, minute = 0 }
 path = "/webhooks/health/api"
 data = { service = "api" }
 
+[sequences.steps.check-api.retry_override]
+min_retries = 5
+delay_seconds = 10
+strategy = "exponential"
+max_delay_seconds = 300
+
 [sequences.steps.report]
 path = "/webhooks/health/report"
 depends_on = ["check-api"]

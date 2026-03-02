@@ -44,6 +44,7 @@ notify:
 | `path` | Endpoint path for delivery (combined with your project domain) |
 | `data` | Optional JSON payload delivered with the hook |
 | `requires` | Optional list of step names that must succeed (2xx) before this step runs |
+| `retry_override` | Optional per-step retry settings (overrides project defaults). See [Per-step retry override](#per-step-retry-override). |
 
 ### Dependency graph
 
@@ -53,6 +54,27 @@ In the example above:
 - **syncData** and **cleanupOldRecords** have no dependencies, so they start in parallel.
 - **notify** waits until both complete with a 2xx response.
 - If a dependency fails, dependent steps do not run for that execution.
+
+### Per-step retry override
+
+By default, each step inherits your [project's retry settings](/essentials/config-as-code#toml-format). You can override retry behavior on individual steps using `retry_override` (TOML) or `retryOverride` (YAML/API). The fields are the same as the [per-hook retry override](/essentials/scheduling#per-hook-retry-override), using snake_case in TOML.
+
+```toml
+[sequences.steps.critical-step]
+path = "/webhooks/payment/process"
+
+[sequences.steps.critical-step.retry_override]
+min_retries = 10
+delay_seconds = 5
+strategy = "exponential"
+backoff_factor = 2.0
+max_delay_seconds = 300
+jitter = true
+```
+
+<Note>
+  Available retry strategies and limits depend on your plan. If a step override exceeds your plan's limits, the API returns a `400` error with upgrade guidance.
+</Note>
 
 ### Limits
 
