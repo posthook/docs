@@ -113,6 +113,14 @@ WebSocket delivery allows you to receive webhooks on your local machine without 
   This is intended for development only. For production, we recommend using standard HTTPS delivery.
 </Note>
 
+## Async Hooks (Beta)
+
+Async hooks let your endpoint return **HTTP 202** to acknowledge receipt, then call back to Posthook when processing completes. This removes the 10-second delivery timeout for long-running tasks.
+
+Toggle **Async Hooks** on in the dashboard to include `Posthook-Ack-URL` and `Posthook-Nack-URL` callback headers with every delivery. This setting is not yet available in `posthook.toml`.
+
+See the [Async Hooks guide](/essentials/async-hooks) for the full implementation walkthrough.
+
 ## Applying changes
 
 After editing `posthook.toml`, preview and deploy:

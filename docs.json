@@ -57,6 +57,7 @@
             "group": "Features",
             "pages": [
               "essentials/sequences",
+              "essentials/async-hooks",
               "essentials/project-settings",
               "essentials/teams",
               "essentials/local-development",

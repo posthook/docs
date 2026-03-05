@@ -1,0 +1,245 @@
+---
+title: 'Async Hooks'
+description: 'Handle long-running webhook processing with ack/nack callbacks'
+---
+
+Async hooks let your endpoint return **HTTP 202** to acknowledge receipt, then call back to Posthook when processing completes. This removes the 10-second delivery timeout for long-running tasks like video processing, report generation, or third-party API calls.
+
+<Note>
+  Async hooks is in beta. Enable it per-project in [Project Settings](/essentials/project-settings#async-hooks-beta).
+</Note>
+
+## Delivery Flow
+
+When async hooks are enabled, each delivery includes two extra headers: `Posthook-Ack-URL` and `Posthook-Nack-URL`.
+
+1. Your endpoint receives the delivery and returns **202 Accepted**.
+2. Your code processes the work.
+3. You call back with the result.
+
+| Callback | Result |
+| --- | --- |
+| POST to ack URL | Hook marked **completed** |
+| POST to nack URL | Hook **retried** or **failed** per your retry policy |
+| Neither (deadline passes) | Hook **retried** or **failed** per your retry policy |
+
+## Receiving Async Deliveries
+
+Return 202 immediately, then process in the background and call `ack()` or `nack()` when done.
+
+<CodeGroup>
+
+```javascript Express.js
+import express from 'express';
+import { Signatures, SignatureVerificationError } from '@posthook/node';
+
+const app = express();
+const signatures = new Signatures(process.env.POSTHOOK_SIGNING_KEY);
+
+app.post('/webhooks/process-video', express.raw({ type: '*/*' }), async (req, res) => {
+  try {
+    const delivery = signatures.parseDelivery(req.body, req.headers);
+
+    res.status(202).end();
+    try {
+      await processVideo(delivery.data.videoId);
+      await delivery.ack();
+    } catch (err) {
+      await delivery.nack({ error: err.message });
+    }
+  } catch (err) {
+    if (err instanceof SignatureVerificationError) {
+      return res.status(401).json({ error: err.message });
+    }
+    throw err;
+  }
+});
+```
+
+```python FastAPI
+import os
+from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
+from fastapi.responses import Response
+import posthook
+
+app = FastAPI()
+client = posthook.Posthook(os.environ["POSTHOOK_API_KEY"], signing_key=os.environ["POSTHOOK_SIGNING_KEY"])
+
+async def process_and_ack(delivery):
+    try:
+        await process_video(delivery.data["video_id"])
+        await posthook.async_ack(delivery.ack_url)
+    except Exception as e:
+        await posthook.async_nack(delivery.nack_url, {"error": str(e)})
+
+@app.post('/webhooks/process-video')
+async def handle_webhook(request: Request, background_tasks: BackgroundTasks):
+    body = await request.body()
+    headers = dict(request.headers)
+
+    try:
+        delivery = client.signatures.parse_delivery(body, headers)
+    except posthook.SignatureVerificationError:
+        raise HTTPException(status_code=401)
+
+    background_tasks.add_task(process_and_ack, delivery)
+    return Response(status_code=202)
+```
+
+```go Go (net/http)
+package main
+
+import (
+	"context"
+	"io"
+	"net/http"
+	"os"
+
+	posthook "github.com/posthook/posthook-go"
+)
+
+var client, _ = posthook.NewClient(os.Getenv("POSTHOOK_API_KEY"), posthook.WithSigningKey(os.Getenv("POSTHOOK_SIGNING_KEY")))
+
+func handleWebhook(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+
+	delivery, err := client.Signatures.ParseDelivery(body, r.Header)
+	if err != nil {
+		http.Error(w, "Invalid signature", http.StatusUnauthorized)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+	go func() {
+		if err := processVideo(delivery.Data); err != nil {
+			delivery.Nack(context.Background(), map[string]any{"error": err.Error()})
+			return
+		}
+		delivery.Ack(context.Background(), nil)
+	}()
+}
+```
+
+</CodeGroup>
+
+<Note>
+  Make sure async hooks is enabled in [Project Settings](/essentials/project-settings#async-hooks-beta). Without the callback headers, long-running work will hit the standard 10-second delivery timeout.
+</Note>
+
+<Tip>
+  Developing locally? Async hooks work with the CLI in [forward mode](/essentials/local-development#async-hooks) — the callback headers are forwarded automatically.
+</Tip>
+
+## Passing Work to a Queue
+
+If processing happens in a separate worker or service, pass the raw callback URLs through your queue and call them from the worker.
+
+```javascript
+// Webhook handler — enqueue and respond
+app.post('/webhooks/process-video', express.raw({ type: '*/*' }), async (req, res) => {
+  const delivery = signatures.parseDelivery(req.body, req.headers);
+
+  await videoQueue.add('transcode', {
+    videoId: delivery.data.videoId,
+    ackUrl: delivery.ackUrl,
+    nackUrl: delivery.nackUrl,
+  });
+  return res.status(202).end();
+});
+
+// Worker — process and call back
+videoQueue.process('transcode', async (job) => {
+  try {
+    await processVideo(job.data.videoId);
+    await fetch(job.data.ackUrl, { method: 'POST' });
+  } catch (err) {
+    await fetch(job.data.nackUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: err.message }),
+    });
+  }
+});
+```
+
+<Tip>
+  Callback URLs are plain HTTPS endpoints. Any service that can make an HTTP POST can call them — no SDK required.
+</Tip>
+
+## Timeouts
+
+If neither ack nor nack is received before the deadline, the attempt is treated as a failure and follows your [retry settings](/essentials/receiving-webhooks#retries).
+
+The default timeout is **300 seconds (5 minutes)**. Override it per delivery by setting a `Posthook-Async-Timeout` header on your 202 response:
+
+```javascript
+res.setHeader('Posthook-Async-Timeout', '600'); // 10 minutes
+res.status(202).end();
+```
+
+| | Value |
+| --- | --- |
+| Minimum | `10` seconds |
+| Default | `300` seconds (5 min) |
+| Maximum | `10800` seconds (3 hours) |
+
+<Note>
+  `Posthook-Async-Timeout` is a **response** header that you set. This is the opposite direction from the other `Posthook-*` headers, which Posthook sends to you.
+</Note>
+
+## Callback Responses
+
+When you POST to an ack or nack URL, Posthook returns a status code indicating what happened.
+
+| Status | Meaning | Action |
+| --- | --- | --- |
+| `200` | Callback accepted, or hook already resolved for this attempt | None |
+| `401` | Invalid callback token | Check configuration |
+| `404` | Hook was deleted | None |
+| `409` | Hook already moved to a newer attempt | None |
+| `410` | Callback expired (token or deadline elapsed) | None — treat as terminal |
+
+**`200`** can mean your callback was applied, or the attempt was already resolved moments earlier (e.g., timeout won the race). Both are terminal for that callback.
+
+**`409`** means the hook has already advanced to a newer retry attempt — your callback URL belongs to an older attempt. No action needed; Posthook is handling the newer attempt.
+
+**`410`** means the callback URL can no longer affect hook state. The token expired or the async deadline elapsed. Treat it as terminal.
+
+### SDK behavior
+
+The SDK `ack()` and `nack()` helpers handle these responses for you:
+
+- **200**, **404**, **409** resolve without throwing. `200` includes an `applied` flag indicating whether state actually changed.
+- **401** and **410** raise a callback error.
+
+### Nack bodies
+
+Ack request bodies are ignored. Nack request bodies are captured for diagnostics (up to **8 KB**). Include structured JSON if you want failure details visible in the dashboard.
+
+```javascript
+await delivery.nack({
+  error: 'Transcoding failed',
+  code: 'FFMPEG_EXIT_1',
+  duration_ms: 45200,
+});
+```
+
+## Retries
+
+Async failures — both `nack` and timeout — use the same retry logic as synchronous failures. A nack or timeout increments the attempt counter and applies your project's retry policy (or the hook's [`retryOverride`](/essentials/scheduling#per-hook-retry-override)). If the hook has exhausted all retries, it is marked as **failed**.
+
+There's nothing new to configure. If your project retries 5 times with exponential backoff, that same policy applies whether the failure came from an HTTP 500, a nack, or a timeout.
+
+<Tip>
+  Async hooks still follow at-least-once delivery. Keep your handlers [idempotent](/essentials/receiving-webhooks#idempotency).
+</Tip>
+
+## Monitoring
+
+The hook detail page in the dashboard shows async-specific state:
+
+- **Awaiting Ack** status while a callback is pending
+- Ack deadline for the current attempt
+- Outcome per attempt: ack, nack, or timeout
+- Elapsed time between delivery and callback
+- Captured nack body (up to 8 KB)

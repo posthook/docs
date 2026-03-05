@@ -185,17 +185,7 @@ If the work fails (e.g., `sendReminder` errors), the transaction rolls back, the
 
 ### Handling Long-Running Tasks
 
-Posthook enforces a **10-second timeout** on webhook delivery. If your task takes longer than 10 seconds (e.g., generating a PDF, processing a video), your request will time out and be retried.
-
-To handle this, you should implement an **Async Pattern**:
-1.  Receive the webhook.
-2.  Push the job to an internal background queue (e.g., Redis, SQS, BullMQ).
-3.  **Return `200 OK` immediately** to Posthook.
-4.  Process the job asynchronously in your worker.
-
-<Tip>
-  If you need to track the completion of these long-running tasks (especially if they are 3rd-party APIs), check out the [Recursive Polling](/patterns/polling) pattern.
-</Tip>
+This section has moved to [Receiving Webhooks: Handling Long-Running Tasks](/essentials/receiving-webhooks#handling-long-running-tasks).
 
 ## Verifying Signatures
 

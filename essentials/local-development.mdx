@@ -54,6 +54,10 @@ When `--forward` is specified, the CLI forwards each incoming hook as an HTTP PO
 
 The CLI reports the response status from your local server and automatically accepts or fails the hook based on the HTTP status code (2xx = accept, anything else = fail). Hooks are processed in parallel with no user interaction required.
 
+#### Async hooks
+
+[Async hooks](/essentials/async-hooks) work in forward mode with no extra configuration. When async hooks are enabled on your project, the CLI includes `Posthook-Ack-URL` and `Posthook-Nack-URL` headers in the forwarded request. If your local endpoint returns **202**, the CLI relays the `Posthook-Async-Timeout` response header back to Posthook and waits for your code to call back via the ack/nack URLs.
+
 ### Interactive mode
 
 Without `--forward`, the CLI enters interactive mode. Each hook is presented one at a time with its ID, path, timestamps, payload, and attempt history. When a hook arrives you can:
