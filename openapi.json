@@ -2,7 +2,8 @@
     "openapi": "3.0.0",
     "info": {
         "title": "Posthook API",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "description": "REST API for scheduling, managing, and inspecting durable webhook deliveries."
     },
     "servers": [
         {
@@ -195,6 +196,7 @@
         "/hooks": {
             "get": {
                 "summary": "List Hooks",
+                "description": "Retrieve a paginated list of hooks for the current project. Supports cursor-based pagination and filtering by status.",
                 "parameters": [
                     {
                         "name": "limit",
@@ -312,6 +314,7 @@
             },
             "post": {
                 "summary": "Schedule Hook",
+                "description": "Schedule a new hook for delivery at a specific time. Supports UTC, local-time, and relative-delay scheduling modes.",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -413,6 +416,7 @@
         "/hooks/{id}": {
             "get": {
                 "summary": "Get Hook",
+                "description": "Retrieve a single hook by ID.",
                 "parameters": [
                     {
                         "name": "id",
@@ -443,6 +447,7 @@
             },
             "delete": {
                 "summary": "Cancel Hook",
+                "description": "Cancel a hook. The hook will be cancelled immediately and deleted.",
                 "parameters": [
                     {
                         "name": "id",

@@ -8,6 +8,13 @@
     "href": "https://posthook.io"
   },
   "favicon": "/favicon.svg",
+  "metadata": {
+    "og:site_name": "Posthook Docs",
+    "og:image": "https://posthook.io/images/og-image.png",
+    "og:description": "Posthook documentation — schedule webhooks for exactly when you need them. Guides, API reference, and integration patterns.",
+    "twitter:card": "summary_large_image",
+    "twitter:site": "@posthook"
+  },
   "colors": {
     "primary": "#357EDD",
     "light": "#357EDD",
